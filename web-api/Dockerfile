@@ -8,20 +8,28 @@ COPY frontend/ ./
 RUN npm run build
 
 # Build stage for backend
-FROM golang:1.21-alpine AS backend-builder
+FROM golang:1.21-bullseye AS backend-builder
 
-RUN apk add --no-cache gcc musl-dev sqlite-dev
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libc6-dev \
+    libsqlite3-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=1 GOOS=linux go build -tags="sqlite_omit_load_extension" -ldflags="-s -w" -o web-api ./cmd/main.go
+RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -o web-api ./cmd/main.go
 
 # Final stage
-FROM alpine:latest
+FROM debian:bullseye-slim
 
-RUN apk --no-cache add ca-certificates sqlite wget
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    libsqlite3-0 \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 

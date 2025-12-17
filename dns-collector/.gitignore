@@ -1,0 +1,17 @@
+# Binaries
+dns-collector
+
+# Tools
+tools/check_db
+tools/check_stats
+tools/check_docker_dbs
+
+# Test binary
+*.test
+
+# Data files
+*.db
+*.db-shm
+*.db-wal
+docker_domains.db
+docker_stats.db

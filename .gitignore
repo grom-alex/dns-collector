@@ -1,6 +1,7 @@
 # Binaries
 build/
-dns-collector
+dns-collector/dns-collector
+web-api/web-api
 *.exe
 *.dll
 *.so
