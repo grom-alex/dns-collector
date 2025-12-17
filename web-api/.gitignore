@@ -9,7 +9,6 @@ web-api
 # Go
 *.test
 *.out
-go.sum
 
 # Frontend
 node_modules/
