@@ -4,12 +4,12 @@ Production-ready configuration for DNS Collector system.
 
 ## Version
 
-**v2.0.0** - PostgreSQL migration release
+**v2.0.1** - Environment variable configuration support
 
 ## Docker Images
 
-- `registry.gromas.ru/apps/dns-collector/dns-collector:2.0.0`
-- `registry.gromas.ru/apps/dns-collector/web-api:2.0.0`
+- `registry.gromas.ru/apps/dns-collector/dns-collector:2.0.1`
+- `registry.gromas.ru/apps/dns-collector/web-api:2.0.1`
 
 ## Quick Start
 
@@ -46,11 +46,9 @@ cp .env.example .env
 
 # Edit .env file with your settings
 nano .env
-
-# Update database passwords in config files
-nano config/dns-collector.yaml
-nano config/web-api.yaml
 ```
+
+**Note**: Starting from v2.0.1, database password and SSL mode are configured via environment variables in `.env` file. You no longer need to edit the YAML config files for these settings.
 
 ### 4. Important Security Settings
 
@@ -61,7 +59,16 @@ nano config/web-api.yaml
    POSTGRES_PASSWORD=YourStrongPasswordHere
    ```
 
-2. **Data Storage Path** (optional) in `.env`:
+2. **PostgreSQL SSL Mode** in `.env`:
+   ```
+   # Use "disable" if PostgreSQL doesn't have SSL configured
+   POSTGRES_SSL_MODE=disable
+
+   # Use "require" for production with SSL enabled
+   POSTGRES_SSL_MODE=require
+   ```
+
+3. **Data Storage Path** (optional) in `.env`:
    ```
    # Leave empty to use Docker volume (recommended)
    POSTGRES_DATA_PATH=
@@ -76,13 +83,7 @@ nano config/web-api.yaml
    sudo chown -R 999:999 /var/lib/dns-collector/postgres
    ```
 
-3. **Database passwords** in both config files:
-   - `config/dns-collector.yaml`
-   - `config/web-api.yaml`
-
-4. **SSL Mode**: Already set to `require` in configs
-
-5. **CORS Origins** in `config/web-api.yaml`:
+4. **CORS Origins** in `config/web-api.yaml`:
    ```yaml
    cors:
      allowed_origins:
