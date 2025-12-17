@@ -34,7 +34,7 @@ WORKDIR /app
 COPY --from=builder /build/dns-collector .
 
 # Копируем конфигурационный файл
-COPY config.yaml .
+COPY config/ ./config/
 
 # Создаем пользователя для запуска приложения
 RUN groupadd -g 1000 dnscollector && \
@@ -48,4 +48,4 @@ EXPOSE 5353/udp
 
 # Запуск приложения
 ENTRYPOINT ["./dns-collector"]
-CMD ["-config", "/app/config.yaml"]
+CMD ["-config", "/app/config/config.yaml"]

@@ -59,7 +59,7 @@ services:
 
     # Volumes
     volumes:
-      - ./dns-collector/config.yaml:/app/config.yaml:ro
+      - ./dns-collector/config:/app/config:ro
 
     # Переменные окружения (опционально)
     environment:
