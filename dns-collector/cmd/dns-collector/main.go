@@ -27,13 +27,20 @@ func main() {
 	log.Printf("Configuration loaded from: %s", *configPath)
 
 	// Initialize database
-	db, err := database.New(cfg.Database.DomainsDB, cfg.Database.StatsDB)
+	db, err := database.New(
+		cfg.Database.Host,
+		cfg.Database.Port,
+		cfg.Database.User,
+		cfg.Database.Password,
+		cfg.Database.Database,
+		cfg.Database.SSLMode,
+	)
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 	defer db.Close()
 
-	log.Println("Database initialized")
+	log.Println("Database connected successfully")
 
 	// Create and start UDP server
 	udpServer := server.NewUDPServer(cfg, db)

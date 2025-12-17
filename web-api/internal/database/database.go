@@ -6,47 +6,45 @@ import (
 	"net"
 	"regexp"
 	"strings"
+	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/lib/pq"
 
 	"dns-collector-webapi/internal/models"
 )
 
 type Database struct {
-	DomainsDB *sql.DB
-	StatsDB   *sql.DB
+	DB *sql.DB
 }
 
-func New(domainsDBPath, statsDBPath string) (*Database, error) {
-	domainsDB, err := sql.Open("sqlite3", domainsDBPath+"?mode=ro")
+func New(host string, port int, user, password, dbname, sslmode string) (*Database, error) {
+	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+		host, port, user, password, dbname, sslmode)
+
+	db, err := sql.Open("postgres", connStr)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open domains database: %w", err)
+		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	statsDB, err := sql.Open("sqlite3", statsDBPath+"?mode=ro")
-	if err != nil {
-		domainsDB.Close()
-		return nil, fmt.Errorf("failed to open stats database: %w", err)
+	// Test connection
+	if err := db.Ping(); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	return &Database{
-		DomainsDB: domainsDB,
-		StatsDB:   statsDB,
-	}, nil
+	// Set connection pool settings
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(5 * time.Minute)
+
+	return &Database{DB: db}, nil
 }
 
 func (db *Database) Close() error {
-	var err1, err2 error
-	if db.DomainsDB != nil {
-		err1 = db.DomainsDB.Close()
+	if db.DB != nil {
+		return db.DB.Close()
 	}
-	if db.StatsDB != nil {
-		err2 = db.StatsDB.Close()
-	}
-	if err1 != nil {
-		return err1
-	}
-	return err2
+	return nil
 }
 
 // GetStats retrieves DNS query statistics with filtering and sorting
@@ -54,6 +52,7 @@ func (db *Database) GetStats(filter models.StatsFilter) ([]models.DomainStat, in
 	query := "SELECT id, domain, client_ip, rtype, timestamp FROM domain_stat WHERE 1=1"
 	countQuery := "SELECT COUNT(*) FROM domain_stat WHERE 1=1"
 	args := []interface{}{}
+	argPos := 1
 
 	// Apply client IP filters
 	if len(filter.ClientIPs) > 0 || filter.Subnet != "" {
@@ -63,7 +62,8 @@ func (db *Database) GetStats(filter models.StatsFilter) ([]models.DomainStat, in
 		if len(filter.ClientIPs) > 0 {
 			placeholders := make([]string, len(filter.ClientIPs))
 			for i, ip := range filter.ClientIPs {
-				placeholders[i] = "?"
+				placeholders[i] = fmt.Sprintf("$%d", argPos)
+				argPos++
 				args = append(args, ip)
 			}
 			ipConditions = append(ipConditions, fmt.Sprintf("client_ip IN (%s)", strings.Join(placeholders, ",")))
@@ -71,7 +71,7 @@ func (db *Database) GetStats(filter models.StatsFilter) ([]models.DomainStat, in
 
 		// Handle subnet
 		if filter.Subnet != "" {
-			// We'll filter subnet in application layer since SQLite doesn't have native CIDR support
+			// We'll filter subnet in application layer
 			ipConditions = append(ipConditions, "1=1")
 		}
 
@@ -83,19 +83,21 @@ func (db *Database) GetStats(filter models.StatsFilter) ([]models.DomainStat, in
 
 	// Apply date filters
 	if !filter.DateFrom.IsZero() {
-		query += " AND timestamp >= ?"
-		countQuery += " AND timestamp >= ?"
+		query += fmt.Sprintf(" AND timestamp >= $%d", argPos)
+		countQuery += fmt.Sprintf(" AND timestamp >= $%d", argPos)
+		argPos++
 		args = append(args, filter.DateFrom)
 	}
 	if !filter.DateTo.IsZero() {
-		query += " AND timestamp <= ?"
-		countQuery += " AND timestamp <= ?"
+		query += fmt.Sprintf(" AND timestamp <= $%d", argPos)
+		countQuery += fmt.Sprintf(" AND timestamp <= $%d", argPos)
+		argPos++
 		args = append(args, filter.DateTo)
 	}
 
 	// Get total count
 	var total int64
-	err := db.StatsDB.QueryRow(countQuery, args...).Scan(&total)
+	err := db.DB.QueryRow(countQuery, args...).Scan(&total)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to count stats: %w", err)
 	}
@@ -117,20 +119,20 @@ func (db *Database) GetStats(filter models.StatsFilter) ([]models.DomainStat, in
 	query += fmt.Sprintf(" ORDER BY %s %s", sortBy, sortOrder)
 
 	// Apply pagination
-	if filter.Limit > 0 {
-		query += " LIMIT ?"
-		args = append(args, filter.Limit)
-	} else {
-		query += " LIMIT 100" // Default limit
-		args = append(args, 100)
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = 100 // Default limit
 	}
+	query += fmt.Sprintf(" LIMIT $%d", argPos)
+	args = append(args, limit)
+	argPos++
 
 	if filter.Offset > 0 {
-		query += " OFFSET ?"
+		query += fmt.Sprintf(" OFFSET $%d", argPos)
 		args = append(args, filter.Offset)
 	}
 
-	rows, err := db.StatsDB.Query(query, args...)
+	rows, err := db.DB.Query(query, args...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to query stats: %w", err)
 	}
@@ -172,22 +174,25 @@ func (db *Database) GetDomains(filter models.DomainsFilter) ([]models.Domain, in
 	query := "SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time FROM domain WHERE 1=1"
 	countQuery := "SELECT COUNT(*) FROM domain WHERE 1=1"
 	args := []interface{}{}
+	argPos := 1
 
 	// Apply date filters
 	if !filter.DateFrom.IsZero() {
-		query += " AND time_insert >= ?"
-		countQuery += " AND time_insert >= ?"
+		query += fmt.Sprintf(" AND time_insert >= $%d", argPos)
+		countQuery += fmt.Sprintf(" AND time_insert >= $%d", argPos)
+		argPos++
 		args = append(args, filter.DateFrom)
 	}
 	if !filter.DateTo.IsZero() {
-		query += " AND time_insert <= ?"
-		countQuery += " AND time_insert <= ?"
+		query += fmt.Sprintf(" AND time_insert <= $%d", argPos)
+		countQuery += fmt.Sprintf(" AND time_insert <= $%d", argPos)
+		argPos++
 		args = append(args, filter.DateTo)
 	}
 
 	// Get total count
 	var total int64
-	err := db.DomainsDB.QueryRow(countQuery, args...).Scan(&total)
+	err := db.DB.QueryRow(countQuery, args...).Scan(&total)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to count domains: %w", err)
 	}
@@ -210,20 +215,20 @@ func (db *Database) GetDomains(filter models.DomainsFilter) ([]models.Domain, in
 	query += fmt.Sprintf(" ORDER BY %s %s", sortBy, sortOrder)
 
 	// Apply pagination
-	if filter.Limit > 0 {
-		query += " LIMIT ?"
-		args = append(args, filter.Limit)
-	} else {
-		query += " LIMIT 100" // Default limit
-		args = append(args, 100)
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = 100 // Default limit
 	}
+	query += fmt.Sprintf(" LIMIT $%d", argPos)
+	args = append(args, limit)
+	argPos++
 
 	if filter.Offset > 0 {
-		query += " OFFSET ?"
+		query += fmt.Sprintf(" OFFSET $%d", argPos)
 		args = append(args, filter.Offset)
 	}
 
-	rows, err := db.DomainsDB.Query(query, args...)
+	rows, err := db.DB.Query(query, args...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to query domains: %w", err)
 	}
@@ -259,9 +264,9 @@ func (db *Database) GetDomains(filter models.DomainsFilter) ([]models.Domain, in
 
 // GetDomainIPs retrieves all IP addresses for a specific domain
 func (db *Database) GetDomainIPs(domainID int64) ([]models.IP, error) {
-	query := "SELECT id, domain_id, ip, type, time FROM ip WHERE domain_id = ? ORDER BY type, ip"
+	query := "SELECT id, domain_id, ip, type, time FROM ip WHERE domain_id = $1 ORDER BY type, ip"
 
-	rows, err := db.DomainsDB.Query(query, domainID)
+	rows, err := db.DB.Query(query, domainID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query IPs: %w", err)
 	}
@@ -281,10 +286,10 @@ func (db *Database) GetDomainIPs(domainID int64) ([]models.IP, error) {
 
 // GetDomainWithIPs retrieves a domain with all its IPs
 func (db *Database) GetDomainWithIPs(domainID int64) (*models.Domain, error) {
-	query := "SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time FROM domain WHERE id = ?"
+	query := "SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time FROM domain WHERE id = $1"
 
 	var d models.Domain
-	err := db.DomainsDB.QueryRow(query, domainID).Scan(
+	err := db.DB.QueryRow(query, domainID).Scan(
 		&d.ID, &d.Domain, &d.TimeInsert, &d.ResolvCount, &d.MaxResolv, &d.LastResolvTime,
 	)
 	if err != nil {

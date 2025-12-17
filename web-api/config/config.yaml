@@ -3,8 +3,12 @@ server:
   host: "0.0.0.0"
 
 database:
-  domains_db: "/app/data/domains.db"
-  stats_db: "/app/data/stats.db"
+  host: "postgres"
+  port: 5432
+  user: "dns_collector"
+  password: "dns_collector_pass"
+  database: "dns_collector"
+  ssl_mode: "disable"
 
 logging:
   level: "info"

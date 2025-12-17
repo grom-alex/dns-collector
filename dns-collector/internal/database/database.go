@@ -5,12 +5,11 @@ import (
 	"fmt"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/lib/pq"
 )
 
 type Database struct {
-	DomainsDB *sql.DB
-	StatsDB   *sql.DB
+	DB *sql.DB
 }
 
 type Domain struct {
@@ -38,81 +37,87 @@ type DomainStat struct {
 	Timestamp time.Time
 }
 
-func New(domainsDBPath, statsDBPath string) (*Database, error) {
-	domainsDB, err := sql.Open("sqlite3", domainsDBPath)
+func New(host string, port int, user, password, dbname, sslmode string) (*Database, error) {
+	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+		host, port, user, password, dbname, sslmode)
+
+	db, err := sql.Open("postgres", connStr)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open domains database: %w", err)
+		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	statsDB, err := sql.Open("sqlite3", statsDBPath)
-	if err != nil {
-		domainsDB.Close()
-		return nil, fmt.Errorf("failed to open stats database: %w", err)
+	// Test connection
+	if err := db.Ping(); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	db := &Database{
-		DomainsDB: domainsDB,
-		StatsDB:   statsDB,
-	}
+	// Set connection pool settings
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(5 * time.Minute)
 
-	if err := db.initSchema(); err != nil {
+	database := &Database{DB: db}
+
+	if err := database.initSchema(); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("failed to initialize schema: %w", err)
 	}
 
-	return db, nil
+	return database, nil
 }
 
 func (db *Database) initSchema() error {
 	// Create domain table
 	domainSchema := `
 	CREATE TABLE IF NOT EXISTS domain (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		id SERIAL PRIMARY KEY,
 		domain TEXT NOT NULL UNIQUE,
-		time_insert DATETIME NOT NULL,
+		time_insert TIMESTAMP NOT NULL,
 		resolv_count INTEGER NOT NULL DEFAULT 0,
 		max_resolv INTEGER NOT NULL,
-		last_resolv_time DATETIME NOT NULL
+		last_resolv_time TIMESTAMP NOT NULL
 	);
 	CREATE INDEX IF NOT EXISTS idx_domain_resolv ON domain(resolv_count, max_resolv);
 	`
 
-	if _, err := db.DomainsDB.Exec(domainSchema); err != nil {
+	if _, err := db.DB.Exec(domainSchema); err != nil {
 		return fmt.Errorf("failed to create domain table: %w", err)
 	}
 
 	// Create ip table
 	ipSchema := `
 	CREATE TABLE IF NOT EXISTS ip (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		id SERIAL PRIMARY KEY,
 		domain_id INTEGER NOT NULL,
 		ip TEXT NOT NULL,
 		type TEXT NOT NULL,
-		time DATETIME NOT NULL,
+		time TIMESTAMP NOT NULL,
 		UNIQUE(domain_id, ip),
 		FOREIGN KEY(domain_id) REFERENCES domain(id) ON DELETE CASCADE
 	);
 	CREATE INDEX IF NOT EXISTS idx_ip_domain ON ip(domain_id);
 	`
 
-	if _, err := db.DomainsDB.Exec(ipSchema); err != nil {
+	if _, err := db.DB.Exec(ipSchema); err != nil {
 		return fmt.Errorf("failed to create ip table: %w", err)
 	}
 
 	// Create domain_stat table
 	statSchema := `
 	CREATE TABLE IF NOT EXISTS domain_stat (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		id SERIAL PRIMARY KEY,
 		domain TEXT NOT NULL,
 		client_ip TEXT NOT NULL,
 		rtype TEXT NOT NULL,
-		timestamp DATETIME NOT NULL
+		timestamp TIMESTAMP NOT NULL
 	);
 	CREATE INDEX IF NOT EXISTS idx_domain_stat_timestamp ON domain_stat(timestamp);
 	CREATE INDEX IF NOT EXISTS idx_domain_stat_domain ON domain_stat(domain);
+	CREATE INDEX IF NOT EXISTS idx_domain_stat_client_ip ON domain_stat(client_ip);
 	`
 
-	if _, err := db.StatsDB.Exec(statSchema); err != nil {
+	if _, err := db.DB.Exec(statSchema); err != nil {
 		return fmt.Errorf("failed to create domain_stat table: %w", err)
 	}
 
@@ -120,49 +125,38 @@ func (db *Database) initSchema() error {
 }
 
 func (db *Database) Close() error {
-	var err1, err2 error
-	if db.DomainsDB != nil {
-		err1 = db.DomainsDB.Close()
+	if db.DB != nil {
+		return db.DB.Close()
 	}
-	if db.StatsDB != nil {
-		err2 = db.StatsDB.Close()
-	}
-	if err1 != nil {
-		return err1
-	}
-	return err2
+	return nil
 }
 
 // InsertOrGetDomain inserts a new domain or returns existing one
 func (db *Database) InsertOrGetDomain(domain string, maxResolv int) (*Domain, error) {
 	now := time.Now()
 
-	// Try to insert
-	result, err := db.DomainsDB.Exec(
-		`INSERT OR IGNORE INTO domain (domain, time_insert, resolv_count, max_resolv, last_resolv_time)
-		VALUES (?, ?, 0, ?, ?)`,
-		domain, now, maxResolv, now,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to insert domain: %w", err)
-	}
-
-	// Get the domain record
+	// Use INSERT ... ON CONFLICT for upsert
 	var d Domain
-	err = db.DomainsDB.QueryRow(
-		`SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time
-		FROM domain WHERE domain = ?`,
-		domain,
+	err := db.DB.QueryRow(
+		`INSERT INTO domain (domain, time_insert, resolv_count, max_resolv, last_resolv_time)
+		VALUES ($1, $2, 0, $3, $4)
+		ON CONFLICT (domain) DO NOTHING
+		RETURNING id, domain, time_insert, resolv_count, max_resolv, last_resolv_time`,
+		domain, now, maxResolv, now,
 	).Scan(&d.ID, &d.Domain, &d.TimeInsert, &d.ResolvCount, &d.MaxResolv, &d.LastResolvTime)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get domain: %w", err)
-	}
 
-	// Check if it was a new insert
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected > 0 {
-		d.TimeInsert = now
-		d.LastResolvTime = now
+	if err == sql.ErrNoRows {
+		// Domain already exists, fetch it
+		err = db.DB.QueryRow(
+			`SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time
+			FROM domain WHERE domain = $1`,
+			domain,
+		).Scan(&d.ID, &d.Domain, &d.TimeInsert, &d.ResolvCount, &d.MaxResolv, &d.LastResolvTime)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get existing domain: %w", err)
+		}
+	} else if err != nil {
+		return nil, fmt.Errorf("failed to insert domain: %w", err)
 	}
 
 	return &d, nil
@@ -170,12 +164,12 @@ func (db *Database) InsertOrGetDomain(domain string, maxResolv int) (*Domain, er
 
 // GetDomainsToResolve returns domains that need to be resolved
 func (db *Database) GetDomainsToResolve(limit int) ([]Domain, error) {
-	rows, err := db.DomainsDB.Query(
+	rows, err := db.DB.Query(
 		`SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time
 		FROM domain
 		WHERE resolv_count < max_resolv
 		ORDER BY last_resolv_time ASC
-		LIMIT ?`,
+		LIMIT $1`,
 		limit,
 	)
 	if err != nil {
@@ -199,12 +193,12 @@ func (db *Database) GetDomainsToResolve(limit int) ([]Domain, error) {
 func (db *Database) InsertOrUpdateIP(domainID int64, ip, ipType string) error {
 	now := time.Now()
 
-	_, err := db.DomainsDB.Exec(
+	_, err := db.DB.Exec(
 		`INSERT INTO ip (domain_id, ip, type, time)
-		VALUES (?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4)
 		ON CONFLICT(domain_id, ip) DO UPDATE SET
-			time = ?,
-			type = ?`,
+			time = $5,
+			type = $6`,
 		domainID, ip, ipType, now, now, ipType,
 	)
 	if err != nil {
@@ -218,11 +212,11 @@ func (db *Database) InsertOrUpdateIP(domainID int64, ip, ipType string) error {
 func (db *Database) UpdateDomainResolvStats(domainID int64) error {
 	now := time.Now()
 
-	_, err := db.DomainsDB.Exec(
+	_, err := db.DB.Exec(
 		`UPDATE domain
 		SET resolv_count = resolv_count + 1,
-		    last_resolv_time = ?
-		WHERE id = ?`,
+		    last_resolv_time = $1
+		WHERE id = $2`,
 		now, domainID,
 	)
 	if err != nil {
@@ -236,9 +230,9 @@ func (db *Database) UpdateDomainResolvStats(domainID int64) error {
 func (db *Database) InsertDomainStat(domain, clientIP, rtype string) error {
 	now := time.Now()
 
-	_, err := db.StatsDB.Exec(
+	_, err := db.DB.Exec(
 		`INSERT INTO domain_stat (domain, client_ip, rtype, timestamp)
-		VALUES (?, ?, ?, ?)`,
+		VALUES ($1, $2, $3, $4)`,
 		domain, clientIP, rtype, now,
 	)
 	if err != nil {

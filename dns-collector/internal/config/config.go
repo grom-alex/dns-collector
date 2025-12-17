@@ -20,8 +20,12 @@ type ServerConfig struct {
 }
 
 type DatabaseConfig struct {
-	DomainsDB string `yaml:"domains_db"`
-	StatsDB   string `yaml:"stats_db"`
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
+	User     string `yaml:"user"`
+	Password string `yaml:"password"`
+	Database string `yaml:"database"`
+	SSLMode  string `yaml:"ssl_mode"`
 }
 
 type ResolverConfig struct {
