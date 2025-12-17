@@ -1,0 +1,19 @@
+server:
+  udp_port: 5353
+
+database:
+  host: "localhost"
+  port: 5432
+  user: "dns_collector"
+  password: "dns_collector_pass"
+  database: "dns_collector"
+  ssl_mode: "disable"
+
+resolver:
+  interval_seconds: 5  # Shorter interval for development
+  max_resolv: 3        # Fewer resolves for testing
+  timeout_seconds: 5
+  workers: 2           # Fewer workers for development
+
+logging:
+  level: "debug"       # Debug mode for development

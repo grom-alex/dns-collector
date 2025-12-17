@@ -1,0 +1,19 @@
+server:
+  udp_port: 5353
+
+database:
+  host: "postgres"
+  port: 5432
+  user: "dns_collector"
+  password: ""  # Set via POSTGRES_PASSWORD environment variable
+  database: "dns_collector"
+  ssl_mode: "disable"  # Set via POSTGRES_SSL_MODE environment variable
+
+resolver:
+  interval_seconds: 300  # 5 minutes - production interval
+  max_resolv: 10
+  timeout_seconds: 10
+  workers: 10  # More workers for production
+
+logging:
+  level: "info"  # info level for production

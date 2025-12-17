@@ -25,8 +25,12 @@ type Config struct {
 		Host string `yaml:"host"`
 	} `yaml:"server"`
 	Database struct {
-		DomainsDB string `yaml:"domains_db"`
-		StatsDB   string `yaml:"stats_db"`
+		Host     string `yaml:"host"`
+		Port     int    `yaml:"port"`
+		User     string `yaml:"user"`
+		Password string `yaml:"password"`
+		Database string `yaml:"database"`
+		SSLMode  string `yaml:"ssl_mode"`
 	} `yaml:"database"`
 	Logging struct {
 		Level string `yaml:"level"`
@@ -71,6 +75,14 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
+	// Override with environment variables if set
+	if envPassword := os.Getenv("POSTGRES_PASSWORD"); envPassword != "" {
+		cfg.Database.Password = envPassword
+	}
+	if envSSLMode := os.Getenv("POSTGRES_SSL_MODE"); envSSLMode != "" {
+		cfg.Database.SSLMode = envSSLMode
+	}
+
 	// Set logging level
 	if cfg.Logging.Level == "debug" {
 		gin.SetMode(gin.DebugMode)
@@ -79,11 +91,20 @@ func main() {
 	}
 
 	// Initialize database
-	db, err := database.New(cfg.Database.DomainsDB, cfg.Database.StatsDB)
+	db, err := database.New(
+		cfg.Database.Host,
+		cfg.Database.Port,
+		cfg.Database.User,
+		cfg.Database.Password,
+		cfg.Database.Database,
+		cfg.Database.SSLMode,
+	)
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 	defer db.Close()
+
+	log.Println("Database connected successfully")
 
 	// Initialize handlers
 	h := handlers.NewHandler(db)

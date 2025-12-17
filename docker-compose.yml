@@ -1,4 +1,51 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: dns-collector-postgres
+
+    # Порты
+    ports:
+      - "5432:5432"
+
+    # Volumes для хранения данных
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    # Переменные окружения
+    environment:
+      - POSTGRES_USER=dns_collector
+      - POSTGRES_PASSWORD=dns_collector_pass
+      - POSTGRES_DB=dns_collector
+      - TZ=Europe/Moscow
+
+    # Restart policy
+    restart: unless-stopped
+
+    # Ограничения ресурсов
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+    # Логирование
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Health check
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dns_collector -d dns_collector"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   dns-collector:
     build:
       context: ./dns-collector
@@ -10,10 +57,9 @@ services:
     ports:
       - "5353:5353/udp"
 
-    # Volumes для хранения данных
+    # Volumes
     volumes:
-      - ./data:/app/data
-      - ./dns-collector/config.yaml:/app/config.yaml:ro
+      - ./dns-collector/config:/app/config:ro
 
     # Переменные окружения (опционально)
     environment:
@@ -39,13 +85,10 @@ services:
         max-size: "10m"
         max-file: "3"
 
-    # Health check
-    healthcheck:
-      test: ["CMD", "sqlite3", "/app/data/domains.db", "SELECT 1;"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
+    # Зависимости
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   web-api:
     build:
@@ -58,9 +101,8 @@ services:
     ports:
       - "8080:8080"
 
-    # Volumes для доступа к БД
+    # Volumes
     volumes:
-      - ./data:/app/data:ro
       - ./web-api/config:/app/config:ro
 
     # Переменные окружения
@@ -72,7 +114,10 @@ services:
 
     # Зависимости
     depends_on:
-      - dns-collector
+      postgres:
+        condition: service_healthy
+      dns-collector:
+        condition: service_started
 
     # Ограничения ресурсов
     deploy:
@@ -127,5 +172,6 @@ services:
 #       - prometheus
 
 volumes:
+  postgres_data:
   prometheus_data:
   grafana_data:

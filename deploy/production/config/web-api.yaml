@@ -1,0 +1,20 @@
+server:
+  port: 8080
+  host: "0.0.0.0"
+
+database:
+  host: "postgres"
+  port: 5432
+  user: "dns_collector"
+  password: ""  # Set via POSTGRES_PASSWORD environment variable
+  database: "dns_collector"
+  ssl_mode: "disable"  # Set via POSTGRES_SSL_MODE environment variable
+
+logging:
+  level: "info"  # info level for production
+
+cors:
+  allowed_origins:
+    - "https://your-domain.com"  # Replace with actual domain
+    - "https://www.your-domain.com"
+  allow_credentials: true

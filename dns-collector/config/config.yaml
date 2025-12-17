@@ -2,8 +2,12 @@ server:
   udp_port: 5353
 
 database:
-  domains_db: "data/domains.db"
-  stats_db: "data/stats.db"
+  host: "postgres"
+  port: 5432
+  user: "dns_collector"
+  password: "dns_collector_pass"
+  database: "dns_collector"
+  ssl_mode: "disable"
 
 resolver:
   interval_seconds: 10  # Period for DNS resolution task (10 seconds for testing)

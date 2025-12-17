@@ -20,8 +20,12 @@ type ServerConfig struct {
 }
 
 type DatabaseConfig struct {
-	DomainsDB string `yaml:"domains_db"`
-	StatsDB   string `yaml:"stats_db"`
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
+	User     string `yaml:"user"`
+	Password string `yaml:"password"`
+	Database string `yaml:"database"`
+	SSLMode  string `yaml:"ssl_mode"`
 }
 
 type ResolverConfig struct {
@@ -48,6 +52,14 @@ func Load(path string) (*Config, error) {
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
+	}
+
+	// Override with environment variables if set
+	if envPassword := os.Getenv("POSTGRES_PASSWORD"); envPassword != "" {
+		cfg.Database.Password = envPassword
+	}
+	if envSSLMode := os.Getenv("POSTGRES_SSL_MODE"); envSSLMode != "" {
+		cfg.Database.SSLMode = envSSLMode
 	}
 
 	// Validate configuration

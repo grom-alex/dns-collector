@@ -11,23 +11,20 @@ RUN npm run build
 FROM golang:1.21-bullseye AS backend-builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    libc6-dev \
-    libsqlite3-dev \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -o web-api ./cmd/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o web-api ./cmd/main.go
 
 # Final stage
 FROM debian:bullseye-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
-    libsqlite3-0 \
     wget \
     && rm -rf /var/lib/apt/lists/*
 

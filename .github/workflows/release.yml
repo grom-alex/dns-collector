@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   release:
     name: Create Release
@@ -19,27 +22,22 @@ jobs:
       with:
         go-version: '1.21'
 
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y gcc libc6-dev libsqlite3-dev
-
     - name: Build binaries
       run: |
         # Build DNS Collector
         cd dns-collector
-        CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o dns-collector-linux-amd64 ./cmd/dns-collector
-        tar -czf ../dns-collector-linux-amd64.tar.gz dns-collector-linux-amd64 config.yaml
+        CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o dns-collector-linux-amd64 ./cmd/dns-collector
+        tar -czf ../dns-collector-linux-amd64.tar.gz dns-collector-linux-amd64 config/
         cd ..
 
         # Build Web API
         cd web-api
-        CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o web-api-linux-amd64 ./cmd/
+        CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o web-api-linux-amd64 ./cmd/
         tar -czf ../web-api-linux-amd64.tar.gz web-api-linux-amd64 config/
         cd ..
 
     - name: Create Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         files: |
           dns-collector-linux-amd64.tar.gz
@@ -49,10 +47,11 @@ jobs:
 
           ### Features
           - UDP server for DNS collection
-          - SQLite database storage
+          - PostgreSQL database storage
           - Periodic DNS resolution
           - Web API with REST endpoints
           - Docker deployment support
+          - Environment variable configuration
 
           ### Installation
 
@@ -60,11 +59,13 @@ jobs:
 
           ```bash
           tar -xzf dns-collector-linux-amd64.tar.gz
-          ./dns-collector-linux-amd64 -config config.yaml
+          cd dns-collector-linux-amd64
+          ./dns-collector-linux-amd64 -config config/config.yaml
           ```
+
+          **Note**: PostgreSQL database is required. Configure connection settings in `config/config.yaml` or via environment variables.
 
           For more information, see [README.md](https://github.com/grom-alex/dns-collector/blob/main/README.md)
         draft: false
         prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.GITHUB_TOKEN }}
