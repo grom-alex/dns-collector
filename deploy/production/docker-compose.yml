@@ -9,7 +9,7 @@ services:
       - "5432:5432"
 
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ${POSTGRES_DATA_PATH:-postgres_data}:/var/lib/postgresql/data
 
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-dns_collector}

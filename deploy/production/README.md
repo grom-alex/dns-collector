@@ -20,7 +20,25 @@ Production-ready configuration for DNS Collector system.
 - At least 2GB RAM
 - 10GB free disk space
 
-### 2. Configuration
+### 2. Choose Data Storage Method
+
+**Option A: Docker Volume (Recommended)**
+- Managed by Docker
+- Easier backup/restore with Docker commands
+- Portable across systems
+- No manual permission management
+- Default behavior (no configuration needed)
+
+**Option B: Custom Host Path**
+- Direct access to data on host filesystem
+- Easier integration with host backup tools
+- Better control over data location
+- Useful for NFS/network storage
+- Requires setting `POSTGRES_DATA_PATH` in `.env`
+
+**Recommendation**: Use Docker Volume unless you have specific requirements for host path access.
+
+### 3. Configuration
 
 ```bash
 # Copy environment template
@@ -34,7 +52,7 @@ nano config/dns-collector.yaml
 nano config/web-api.yaml
 ```
 
-### 3. Important Security Settings
+### 4. Important Security Settings
 
 **MUST CHANGE before deployment:**
 
@@ -43,20 +61,35 @@ nano config/web-api.yaml
    POSTGRES_PASSWORD=YourStrongPasswordHere
    ```
 
-2. **Database passwords** in both config files:
+2. **Data Storage Path** (optional) in `.env`:
+   ```
+   # Leave empty to use Docker volume (recommended)
+   POSTGRES_DATA_PATH=
+
+   # Or specify custom path on host
+   POSTGRES_DATA_PATH=/var/lib/dns-collector/postgres
+   ```
+
+   **Note**: If using custom path, ensure directory exists and has proper permissions:
+   ```bash
+   sudo mkdir -p /var/lib/dns-collector/postgres
+   sudo chown -R 999:999 /var/lib/dns-collector/postgres
+   ```
+
+3. **Database passwords** in both config files:
    - `config/dns-collector.yaml`
    - `config/web-api.yaml`
 
-3. **SSL Mode**: Already set to `require` in configs
+4. **SSL Mode**: Already set to `require` in configs
 
-4. **CORS Origins** in `config/web-api.yaml`:
+5. **CORS Origins** in `config/web-api.yaml`:
    ```yaml
    cors:
      allowed_origins:
        - "https://your-actual-domain.com"
    ```
 
-### 4. Deploy
+### 5. Deploy
 
 ```bash
 # Start all services
@@ -72,7 +105,7 @@ docker-compose logs -f
 docker-compose down
 ```
 
-### 5. Health Checks
+### 6. Health Checks
 
 ```bash
 # PostgreSQL
@@ -153,6 +186,8 @@ cat backup_file.sql | docker exec -i dns-collector-postgres psql -U dns_collecto
 
 ### Volume Backup
 
+**For Docker Volume (default):**
+
 ```bash
 # Stop services
 docker-compose down
@@ -162,6 +197,23 @@ docker run --rm -v dns-collector_postgres_data:/data -v $(pwd):/backup alpine ta
 
 # Start services
 docker-compose up -d
+```
+
+**For Custom Path (POSTGRES_DATA_PATH set):**
+
+```bash
+# Stop services
+docker-compose down
+
+# Backup data directory
+sudo tar czf postgres_data_backup_$(date +%Y%m%d_%H%M%S).tar.gz -C /var/lib/dns-collector postgres
+
+# Start services
+docker-compose up -d
+
+# Restore from backup
+sudo tar xzf postgres_data_backup.tar.gz -C /var/lib/dns-collector
+sudo chown -R 999:999 /var/lib/dns-collector/postgres
 ```
 
 ## Troubleshooting
