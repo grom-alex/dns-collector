@@ -51,6 +51,7 @@ services:
       context: ./dns-collector
       dockerfile: Dockerfile
     image: registry.gromas.ru/apps/dns-collector/dns-collector:latest
+    pull_policy: always
     container_name: dns-collector
 
     # Порты
@@ -95,6 +96,7 @@ services:
       context: ./web-api
       dockerfile: Dockerfile
     image: registry.gromas.ru/apps/dns-collector/web-api:latest
+    pull_policy: always
     container_name: dns-collector-webapi
 
     # Порты
