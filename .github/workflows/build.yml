@@ -33,11 +33,11 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y gcc libc6-dev libsqlite3-dev
 
-    - name: Download Go modules
-      run: go mod download
-
     - name: Build DNS Collector
-      run: CGO_ENABLED=1 go build -v -o dns-collector ./cmd/dns-collector
+      run: |
+        cd dns-collector
+        go mod download
+        CGO_ENABLED=1 go build -v -o dns-collector ./cmd/dns-collector
 
     - name: Build Web API
       run: |
@@ -45,11 +45,18 @@ jobs:
         go mod download
         CGO_ENABLED=1 go build -v -o web-api ./cmd/
 
-    - name: Run Go vet
-      run: go vet ./...
+    - name: Run Go vet - DNS Collector
+      run: cd dns-collector && go vet ./...
 
-    - name: Run tests (if any)
-      run: go test -v ./...
+    - name: Run Go vet - Web API
+      run: cd web-api && go vet ./...
+
+    - name: Run tests - DNS Collector
+      run: cd dns-collector && go test -v ./...
+      continue-on-error: true
+
+    - name: Run tests - Web API
+      run: cd web-api && go test -v ./...
       continue-on-error: true
 
   docker:
@@ -67,8 +74,8 @@ jobs:
     - name: Build DNS Collector Docker image
       uses: docker/build-push-action@v5
       with:
-        context: .
-        file: ./Dockerfile
+        context: ./dns-collector
+        file: ./dns-collector/Dockerfile
         push: false
         tags: dns-collector:latest
         cache-from: type=gha

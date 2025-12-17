@@ -1,11 +1,14 @@
 # DNS Collector
 
-Система для сбора DNS запросов, резолвинга доменов и визуализации данных.
+Микросервисная система для сбора DNS запросов, резолвинга доменов и визуализации данных.
 
-## Компоненты
+![Build Status](https://github.com/grom-alex/dns-collector/actions/workflows/build.yml/badge.svg)
+![Release](https://img.shields.io/github/v/release/grom-alex/dns-collector)
 
-1. **dns-collector** - сервис сбора и резолвинга DNS запросов
-2. **web-api** - веб-интерфейс для визуализации и анализа данных
+## Микросервисы
+
+1. **[dns-collector](dns-collector/)** - сервис сбора и резолвинга DNS запросов
+2. **[web-api](web-api/)** - веб-интерфейс для визуализации и анализа данных
 
 ## Возможности
 
@@ -38,10 +41,16 @@ http://localhost:8080
 ## Установка
 
 ```bash
-# Установка зависимостей
-go mod download
+# Клонировать репозиторий
+git clone git@github.com:grom-alex/dns-collector.git
+cd dns-collector
 
-# Сборка программы
+# Запустить с помощью Docker Compose (рекомендуется)
+docker-compose up -d
+
+# Или собрать локально
+cd dns-collector
+go mod download
 go build -o dns-collector ./cmd/dns-collector
 ```
 
@@ -150,13 +159,22 @@ python3 test_client.py
 
 ## Документация
 
+### Общая
 - [QUICKSTART_WEBAPI.md](QUICKSTART_WEBAPI.md) - быстрый старт с веб-интерфейсом
 - [SERVICES.md](SERVICES.md) - архитектура микросервисов
-- [ARCHITECTURE.md](ARCHITECTURE.md) - подробная архитектура dns-collector
+- [CHANGELOG.md](CHANGELOG.md) - история изменений
+
+### DNS Collector
+- [dns-collector/README.md](dns-collector/README.md) - обзор сервиса
+- [dns-collector/INSTALL.md](dns-collector/INSTALL.md) - установка
+- [dns-collector/QUICKSTART.md](dns-collector/QUICKSTART.md) - быстрый старт
+- [dns-collector/ARCHITECTURE.md](dns-collector/ARCHITECTURE.md) - архитектура
+- [dns-collector/DOCKER.md](dns-collector/DOCKER.md) - Docker развертывание
+
+### Web API
 - [web-api/README.md](web-api/README.md) - документация Web API
 - [web-api/INSTALL.md](web-api/INSTALL.md) - установка и отладка web-api
-- [INSTALL.md](INSTALL.md) - установка dns-collector
-- [queries.sql](queries.sql) - полезные SQL запросы
+- [web-api/FEATURES.md](web-api/FEATURES.md) - возможности API
 
 ## Скриншоты
 

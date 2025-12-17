@@ -1,5 +1,8 @@
 services:
   dns-collector:
+    build:
+      context: ./dns-collector
+      dockerfile: Dockerfile
     image: registry.gromas.ru/apps/dns-collector:latest
     container_name: dns-collector
 
@@ -10,7 +13,7 @@ services:
     # Volumes для хранения данных
     volumes:
       - ./data:/app/data
-      - ./config.yaml:/app/config.yaml:ro
+      - ./dns-collector/config.yaml:/app/config.yaml:ro
 
     # Переменные окружения (опционально)
     environment:

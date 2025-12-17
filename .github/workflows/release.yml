@@ -26,15 +26,17 @@ jobs:
 
     - name: Build binaries
       run: |
-        # Linux AMD64
+        # Build DNS Collector
+        cd dns-collector
         CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o dns-collector-linux-amd64 ./cmd/dns-collector
-        cd web-api
-        CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o web-api-linux-amd64 ./cmd/
+        tar -czf ../dns-collector-linux-amd64.tar.gz dns-collector-linux-amd64 config.yaml
         cd ..
 
-        # Create archives
-        tar -czf dns-collector-linux-amd64.tar.gz dns-collector-linux-amd64 config.yaml
-        tar -czf web-api-linux-amd64.tar.gz -C web-api web-api-linux-amd64 config/
+        # Build Web API
+        cd web-api
+        CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o web-api-linux-amd64 ./cmd/
+        tar -czf ../web-api-linux-amd64.tar.gz web-api-linux-amd64 config/
+        cd ..
 
     - name: Create Release
       uses: softprops/action-gh-release@v1
