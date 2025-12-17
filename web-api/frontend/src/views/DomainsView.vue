@@ -10,6 +10,7 @@
             v-model="filters.domainRegex"
             type="text"
             placeholder="^google\\..*|.*\\.com$"
+            @keyup.enter="applyFilters"
           />
           <small style="color: #666;">Use regular expressions to filter domains</small>
         </div>
@@ -19,6 +20,7 @@
           <input
             v-model="filters.dateFrom"
             type="datetime-local"
+            @keyup.enter="applyFilters"
           />
         </div>
 
@@ -27,6 +29,7 @@
           <input
             v-model="filters.dateTo"
             type="datetime-local"
+            @keyup.enter="applyFilters"
           />
         </div>
 
@@ -37,6 +40,7 @@
             type="number"
             min="1"
             max="1000"
+            @keyup.enter="applyFilters"
           />
         </div>
       </div>

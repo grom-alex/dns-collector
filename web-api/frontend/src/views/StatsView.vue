@@ -10,6 +10,7 @@
             v-model="filters.clientIPs"
             type="text"
             placeholder="192.168.1.1, 192.168.1.2"
+            @keyup.enter="applyFilters"
           />
         </div>
 
@@ -19,6 +20,7 @@
             v-model="filters.subnet"
             type="text"
             placeholder="192.168.1.0/24"
+            @keyup.enter="applyFilters"
           />
         </div>
 
@@ -27,6 +29,7 @@
           <input
             v-model="filters.dateFrom"
             type="datetime-local"
+            @keyup.enter="applyFilters"
           />
         </div>
 
@@ -35,6 +38,7 @@
           <input
             v-model="filters.dateTo"
             type="datetime-local"
+            @keyup.enter="applyFilters"
           />
         </div>
 
@@ -45,6 +49,7 @@
             type="number"
             min="1"
             max="1000"
+            @keyup.enter="applyFilters"
           />
         </div>
       </div>
