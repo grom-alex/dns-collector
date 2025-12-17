@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   release:
     name: Create Release
@@ -34,7 +37,7 @@ jobs:
         cd ..
 
     - name: Create Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         files: |
           dns-collector-linux-amd64.tar.gz
@@ -65,5 +68,4 @@ jobs:
           For more information, see [README.md](https://github.com/grom-alex/dns-collector/blob/main/README.md)
         draft: false
         prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.GITHUB_TOKEN }}
