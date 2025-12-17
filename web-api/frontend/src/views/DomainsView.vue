@@ -10,6 +10,7 @@
             v-model="filters.domainRegex"
             type="text"
             placeholder="^google\\..*|.*\\.com$"
+            @keyup.enter="applyFilters"
           />
           <small style="color: #666;">Use regular expressions to filter domains</small>
         </div>
@@ -19,6 +20,7 @@
           <input
             v-model="filters.dateFrom"
             type="datetime-local"
+            @keyup.enter="applyFilters"
           />
         </div>
 
@@ -27,6 +29,7 @@
           <input
             v-model="filters.dateTo"
             type="datetime-local"
+            @keyup.enter="applyFilters"
           />
         </div>
 
@@ -37,6 +40,7 @@
             type="number"
             min="1"
             max="1000"
+            @keyup.enter="applyFilters"
           />
         </div>
       </div>
@@ -87,52 +91,54 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="domain in domains" :key="domain.id">
-              <td>{{ domain.id }}</td>
-              <td><strong>{{ domain.domain }}</strong></td>
-              <td>{{ formatDate(domain.time_insert) }}</td>
-              <td>
-                <span :class="{'text-success': domain.resolv_count >= domain.max_resolv}">
-                  {{ domain.resolv_count }} / {{ domain.max_resolv }}
-                </span>
-              </td>
-              <td>{{ formatDate(domain.last_resolv_time) }}</td>
-              <td>
-                <button
-                  @click="toggleDetails(domain.id)"
-                  class="btn btn-sm btn-primary"
-                >
-                  {{ expandedDomain === domain.id ? 'Hide IPs' : 'Show IPs' }}
-                </button>
-              </td>
-            </tr>
-            <tr v-if="expandedDomain && domainDetails[expandedDomain]" class="details-row">
-              <td colspan="6">
-                <div class="ip-details">
-                  <h3>Resolved IP Addresses</h3>
-                  <div v-if="loadingDetails" class="loading">Loading IP addresses...</div>
-                  <div v-else-if="domainDetails[expandedDomain].ips.length === 0" class="empty">
-                    No IP addresses resolved yet
-                  </div>
-                  <div v-else class="ip-grid">
-                    <div
-                      v-for="ip in domainDetails[expandedDomain].ips"
-                      :key="ip.id"
-                      class="ip-card"
-                      :class="'ip-' + ip.type"
-                    >
-                      <div class="ip-address">
-                        <code>{{ ip.ip }}</code>
-                      </div>
-                      <div class="ip-meta">
-                        <span class="ip-type">{{ ip.type.toUpperCase() }}</span>
-                        <span class="ip-time">{{ formatDate(ip.time) }}</span>
-                      </div>
+            <template v-for="domain in domains" :key="domain.id">
+              <tr>
+                <td>{{ domain.id }}</td>
+                <td><strong>{{ domain.domain }}</strong></td>
+                <td>{{ formatDate(domain.time_insert) }}</td>
+                <td>
+                  <span :class="{'text-success': domain.resolv_count >= domain.max_resolv}">
+                    {{ domain.resolv_count }} / {{ domain.max_resolv }}
+                  </span>
+                </td>
+                <td>{{ formatDate(domain.last_resolv_time) }}</td>
+                <td>
+                  <button
+                    @click="toggleDetails(domain.id)"
+                    class="btn btn-sm btn-primary"
+                  >
+                    {{ expandedDomain === domain.id ? 'Hide IPs' : 'Show IPs' }}
+                  </button>
+                </td>
+              </tr>
+              <tr v-if="expandedDomain === domain.id && domainDetails[domain.id]" class="details-row">
+                <td colspan="6">
+                  <div class="ip-details">
+                    <h3>Resolved IP Addresses for {{ domain.domain }}</h3>
+                    <div v-if="loadingDetails" class="loading">Loading IP addresses...</div>
+                    <div v-else-if="!domainDetails[domain.id].ips || domainDetails[domain.id].ips.length === 0" class="empty">
+                      No IP addresses resolved yet
                     </div>
+                    <table v-else class="ip-table">
+                      <thead>
+                        <tr>
+                          <th>IP Address</th>
+                          <th>Type</th>
+                          <th>Resolved At</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="ip in domainDetails[domain.id].ips" :key="ip.id" :class="'ip-' + ip.type">
+                          <td><code>{{ ip.ip }}</code></td>
+                          <td><span class="ip-type-badge" :class="'badge-' + ip.type">{{ ip.type.toUpperCase() }}</span></td>
+                          <td>{{ formatDate(ip.time) }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
-                </div>
-              </td>
-            </tr>
+                </td>
+              </tr>
+            </template>
           </tbody>
         </table>
       </div>
@@ -213,12 +219,12 @@ export default {
         }
 
         const response = await getDomains(params)
-        domains.value = response.data.data
+        domains.value = response.data.data || []
         pagination.value = {
-          total: response.data.total,
-          limit: response.data.limit,
-          offset: response.data.offset,
-          totalPages: response.data.total_pages
+          total: response.data.total || 0,
+          limit: response.data.limit || filters.value.limit,
+          offset: response.data.offset || 0,
+          totalPages: response.data.total_pages || 0
         }
       } catch (err) {
         error.value = err.response?.data?.error || err.message
@@ -239,7 +245,10 @@ export default {
         loadingDetails.value = true
         try {
           const response = await getDomainById(domainId)
-          domainDetails[domainId] = response.data
+          domainDetails[domainId] = {
+            ...response.data,
+            ips: response.data.ips || []
+          }
         } catch (err) {
           error.value = err.response?.data?.error || err.message
         } finally {
@@ -359,53 +368,75 @@ button:disabled {
 }
 
 .ip-details {
-  padding: 1.5rem;
+  padding: 1rem 1.5rem;
 }
 
 .ip-details h3 {
   margin-bottom: 1rem;
   color: #2c3e50;
-}
-
-.ip-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 1rem;
-}
-
-.ip-card {
-  background: white;
-  border: 1px solid #dee2e6;
-  border-radius: 6px;
-  padding: 1rem;
-}
-
-.ip-ipv4 {
-  border-left: 4px solid #3498db;
-}
-
-.ip-ipv6 {
-  border-left: 4px solid #9b59b6;
-}
-
-.ip-address {
-  margin-bottom: 0.5rem;
-}
-
-.ip-address code {
   font-size: 1rem;
-  font-weight: 500;
 }
 
-.ip-meta {
-  display: flex;
-  justify-content: space-between;
+.ip-table {
+  width: 100%;
+  border-collapse: collapse;
   font-size: 0.8rem;
-  color: #666;
+  margin-top: 0.5rem;
 }
 
-.ip-type {
+.ip-table thead {
+  background: #e9ecef;
+}
+
+.ip-table th {
+  padding: 0.5rem;
+  text-align: left;
   font-weight: 600;
-  text-transform: uppercase;
+  color: #495057;
+  border-bottom: 2px solid #dee2e6;
+  font-size: 0.8rem;
+}
+
+.ip-table td {
+  padding: 0.5rem;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.ip-table tbody tr:hover {
+  background: #f8f9fa;
+}
+
+.ip-table .ip-ipv4 {
+  border-left: 3px solid #3498db;
+}
+
+.ip-table .ip-ipv6 {
+  border-left: 3px solid #9b59b6;
+}
+
+.ip-table code {
+  background: #f4f4f4;
+  padding: 0.15rem 0.4rem;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.75rem;
+}
+
+.ip-type-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.ip-type-badge.badge-ipv4 {
+  background: #3498db;
+  color: white;
+}
+
+.ip-type-badge.badge-ipv6 {
+  background: #9b59b6;
+  color: white;
 }
 </style>

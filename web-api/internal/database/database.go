@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"net"
-	"regexp"
 	"strings"
 	"time"
 
@@ -69,10 +68,16 @@ func (db *Database) GetStats(filter models.StatsFilter) ([]models.DomainStat, in
 			ipConditions = append(ipConditions, fmt.Sprintf("client_ip IN (%s)", strings.Join(placeholders, ",")))
 		}
 
-		// Handle subnet
+		// Handle subnet using PostgreSQL inet operators
 		if filter.Subnet != "" {
-			// We'll filter subnet in application layer
-			ipConditions = append(ipConditions, "1=1")
+			// Validate CIDR format
+			_, _, err := net.ParseCIDR(filter.Subnet)
+			if err != nil {
+				return nil, 0, fmt.Errorf("invalid subnet format: %w", err)
+			}
+			ipConditions = append(ipConditions, fmt.Sprintf("client_ip::inet << $%d::inet", argPos))
+			argPos++
+			args = append(args, filter.Subnet)
 		}
 
 		if len(ipConditions) > 0 {
@@ -139,30 +144,11 @@ func (db *Database) GetStats(filter models.StatsFilter) ([]models.DomainStat, in
 	defer rows.Close()
 
 	var stats []models.DomainStat
-	var subnet *net.IPNet
-
-	// Parse subnet if provided
-	if filter.Subnet != "" {
-		_, subnet, err = net.ParseCIDR(filter.Subnet)
-		if err != nil {
-			return nil, 0, fmt.Errorf("invalid subnet format: %w", err)
-		}
-	}
-
 	for rows.Next() {
 		var s models.DomainStat
 		if err := rows.Scan(&s.ID, &s.Domain, &s.ClientIP, &s.RType, &s.Timestamp); err != nil {
 			return nil, 0, fmt.Errorf("failed to scan stat: %w", err)
 		}
-
-		// Filter by subnet if specified
-		if subnet != nil {
-			ip := net.ParseIP(s.ClientIP)
-			if ip == nil || !subnet.Contains(ip) {
-				continue
-			}
-		}
-
 		stats = append(stats, s)
 	}
 
@@ -175,6 +161,14 @@ func (db *Database) GetDomains(filter models.DomainsFilter) ([]models.Domain, in
 	countQuery := "SELECT COUNT(*) FROM domain WHERE 1=1"
 	args := []interface{}{}
 	argPos := 1
+
+	// Apply domain regex filter in SQL
+	if filter.DomainRegex != "" {
+		query += fmt.Sprintf(" AND domain ~ $%d", argPos)
+		countQuery += fmt.Sprintf(" AND domain ~ $%d", argPos)
+		argPos++
+		args = append(args, filter.DomainRegex)
+	}
 
 	// Apply date filters
 	if !filter.DateFrom.IsZero() {
@@ -235,27 +229,11 @@ func (db *Database) GetDomains(filter models.DomainsFilter) ([]models.Domain, in
 	defer rows.Close()
 
 	var domains []models.Domain
-	var domainRegex *regexp.Regexp
-
-	// Compile regex if provided
-	if filter.DomainRegex != "" {
-		domainRegex, err = regexp.Compile(filter.DomainRegex)
-		if err != nil {
-			return nil, 0, fmt.Errorf("invalid regex pattern: %w", err)
-		}
-	}
-
 	for rows.Next() {
 		var d models.Domain
 		if err := rows.Scan(&d.ID, &d.Domain, &d.TimeInsert, &d.ResolvCount, &d.MaxResolv, &d.LastResolvTime); err != nil {
 			return nil, 0, fmt.Errorf("failed to scan domain: %w", err)
 		}
-
-		// Filter by regex if specified
-		if domainRegex != nil && !domainRegex.MatchString(d.Domain) {
-			continue
-		}
-
 		domains = append(domains, d)
 	}
 

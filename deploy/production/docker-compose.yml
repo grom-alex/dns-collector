@@ -43,6 +43,7 @@ services:
 
   dns-collector:
     image: registry.gromas.ru/apps/dns-collector/dns-collector:2.0.1
+    pull_policy: always
     container_name: dns-collector
 
     ports:
@@ -79,6 +80,7 @@ services:
 
   web-api:
     image: registry.gromas.ru/apps/dns-collector/web-api:2.0.1
+    pull_policy: always
     container_name: dns-collector-webapi
 
     ports:
