@@ -5,7 +5,10 @@
       "Bash(sg docker:*)",
       "Bash(python3:*)",
       "Bash(go run:*)",
-      "Bash(docker-compose build:*)"
+      "Bash(docker-compose build:*)",
+      "Bash(git add:*)",
+      "Bash(docker-compose logs:*)",
+      "Bash(nc:*)"
     ]
   }
 }

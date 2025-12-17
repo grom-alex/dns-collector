@@ -6,9 +6,9 @@ database:
   host: "postgres"
   port: 5432
   user: "dns_collector"
-  password: "CHANGE_ME_IN_PRODUCTION"  # Use environment variable or secrets management
+  password: ""  # Set via POSTGRES_PASSWORD environment variable
   database: "dns_collector"
-  ssl_mode: "require"  # Enable SSL for production
+  ssl_mode: "disable"  # Set via POSTGRES_SSL_MODE environment variable
 
 logging:
   level: "info"  # info level for production

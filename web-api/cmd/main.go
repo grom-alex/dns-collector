@@ -75,6 +75,14 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
+	// Override with environment variables if set
+	if envPassword := os.Getenv("POSTGRES_PASSWORD"); envPassword != "" {
+		cfg.Database.Password = envPassword
+	}
+	if envSSLMode := os.Getenv("POSTGRES_SSL_MODE"); envSSLMode != "" {
+		cfg.Database.SSLMode = envSSLMode
+	}
+
 	// Set logging level
 	if cfg.Logging.Level == "debug" {
 		gin.SetMode(gin.DebugMode)

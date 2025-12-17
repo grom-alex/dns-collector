@@ -54,6 +54,14 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
 	}
 
+	// Override with environment variables if set
+	if envPassword := os.Getenv("POSTGRES_PASSWORD"); envPassword != "" {
+		cfg.Database.Password = envPassword
+	}
+	if envSSLMode := os.Getenv("POSTGRES_SSL_MODE"); envSSLMode != "" {
+		cfg.Database.SSLMode = envSSLMode
+	}
+
 	// Validate configuration
 	if cfg.Server.UDPPort <= 0 || cfg.Server.UDPPort > 65535 {
 		return nil, fmt.Errorf("invalid UDP port: %d", cfg.Server.UDPPort)

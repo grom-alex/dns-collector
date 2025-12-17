@@ -42,7 +42,7 @@ services:
       start_period: 10s
 
   dns-collector:
-    image: registry.gromas.ru/apps/dns-collector/dns-collector:2.0.0
+    image: registry.gromas.ru/apps/dns-collector/dns-collector:2.0.1
     container_name: dns-collector
 
     ports:
@@ -53,6 +53,8 @@ services:
 
     environment:
       - TZ=${TZ:-UTC}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-CHANGE_ME_IN_PRODUCTION}
+      - POSTGRES_SSL_MODE=${POSTGRES_SSL_MODE:-disable}
 
     restart: unless-stopped
 
@@ -76,7 +78,7 @@ services:
         max-file: "5"
 
   web-api:
-    image: registry.gromas.ru/apps/dns-collector/web-api:2.0.0
+    image: registry.gromas.ru/apps/dns-collector/web-api:2.0.1
     container_name: dns-collector-webapi
 
     ports:
@@ -87,6 +89,8 @@ services:
 
     environment:
       - TZ=${TZ:-UTC}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-CHANGE_ME_IN_PRODUCTION}
+      - POSTGRES_SSL_MODE=${POSTGRES_SSL_MODE:-disable}
 
     restart: unless-stopped
 
