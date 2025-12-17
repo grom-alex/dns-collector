@@ -185,12 +185,12 @@ export default {
         }
 
         const response = await getStats(params)
-        stats.value = response.data.data
+        stats.value = response.data.data || []
         pagination.value = {
-          total: response.data.total,
-          limit: response.data.limit,
-          offset: response.data.offset,
-          totalPages: response.data.total_pages
+          total: response.data.total || 0,
+          limit: response.data.limit || filters.value.limit,
+          offset: response.data.offset || 0,
+          totalPages: response.data.total_pages || 0
         }
       } catch (err) {
         error.value = err.response?.data?.error || err.message

@@ -111,7 +111,7 @@
                 <div class="ip-details">
                   <h3>Resolved IP Addresses</h3>
                   <div v-if="loadingDetails" class="loading">Loading IP addresses...</div>
-                  <div v-else-if="domainDetails[expandedDomain].ips.length === 0" class="empty">
+                  <div v-else-if="!domainDetails[expandedDomain].ips || domainDetails[expandedDomain].ips.length === 0" class="empty">
                     No IP addresses resolved yet
                   </div>
                   <div v-else class="ip-grid">
@@ -213,12 +213,12 @@ export default {
         }
 
         const response = await getDomains(params)
-        domains.value = response.data.data
+        domains.value = response.data.data || []
         pagination.value = {
-          total: response.data.total,
-          limit: response.data.limit,
-          offset: response.data.offset,
-          totalPages: response.data.total_pages
+          total: response.data.total || 0,
+          limit: response.data.limit || filters.value.limit,
+          offset: response.data.offset || 0,
+          totalPages: response.data.total_pages || 0
         }
       } catch (err) {
         error.value = err.response?.data?.error || err.message
@@ -239,7 +239,10 @@ export default {
         loadingDetails.value = true
         try {
           const response = await getDomainById(domainId)
-          domainDetails[domainId] = response.data
+          domainDetails[domainId] = {
+            ...response.data,
+            ips: response.data.ips || []
+          }
         } catch (err) {
           error.value = err.response?.data?.error || err.message
         } finally {
