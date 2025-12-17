@@ -1,0 +1,19 @@
+server:
+  udp_port: 5353
+
+database:
+  host: "postgres"
+  port: 5432
+  user: "dns_collector"
+  password: "CHANGE_ME_IN_PRODUCTION"  # Use environment variable or secrets management
+  database: "dns_collector"
+  ssl_mode: "require"  # Enable SSL for production
+
+resolver:
+  interval_seconds: 300  # 5 minutes - production interval
+  max_resolv: 10
+  timeout_seconds: 10
+  workers: 10  # More workers for production
+
+logging:
+  level: "info"  # info level for production

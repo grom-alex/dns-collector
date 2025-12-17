@@ -1,0 +1,20 @@
+server:
+  port: 8080
+  host: "0.0.0.0"
+
+database:
+  host: "postgres"
+  port: 5432
+  user: "dns_collector"
+  password: "CHANGE_ME_IN_PRODUCTION"  # Use environment variable or secrets management
+  database: "dns_collector"
+  ssl_mode: "require"  # Enable SSL for production
+
+logging:
+  level: "info"  # info level for production
+
+cors:
+  allowed_origins:
+    - "https://your-domain.com"  # Replace with actual domain
+    - "https://www.your-domain.com"
+  allow_credentials: true
