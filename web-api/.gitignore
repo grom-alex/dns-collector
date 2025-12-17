@@ -1,0 +1,38 @@
+# Binaries
+bin/
+web-api
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Go
+*.test
+*.out
+go.sum
+
+# Frontend
+node_modules/
+frontend/dist/
+frontend/node_modules/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data
+*.db
+*.db-shm
+*.db-wal
+
+# Config
+config.dev.yaml
+config.local.yaml

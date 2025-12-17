@@ -1,0 +1,53 @@
+# Binaries
+build/
+dns-collector
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output
+*.out
+
+# Databases
+*.db
+*.db-shm
+*.db-wal
+data/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Documentation
+README.md
+INSTALL.md
+ARCHITECTURE.md
+queries.sql
+
+# Scripts
+monitor.sh
+test_client.py
+*.sh
+
+# Build artifacts
+*.test

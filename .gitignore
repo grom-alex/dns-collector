@@ -1,0 +1,40 @@
+# Binaries
+build/
+dns-collector
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Databases
+*.db
+*.db-shm
+*.db-wal
+data/
+
+# Config files (optional, uncomment if you don't want to commit config)
+# config.yaml
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

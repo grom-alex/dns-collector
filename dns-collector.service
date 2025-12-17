@@ -1,0 +1,47 @@
+[Unit]
+Description=DNS Collector Service
+Documentation=https://github.com/yourusername/dns-collector
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+# Пользователь и группа (измените на нужные)
+User=your-username
+Group=your-username
+
+# Рабочая директория
+WorkingDirectory=/home/test/projects/dns-collector
+
+# Команда запуска
+ExecStart=/home/test/projects/dns-collector/build/dns-collector -config /home/test/projects/dns-collector/config.yaml
+
+# Перезапуск при падении
+Restart=on-failure
+RestartSec=5s
+
+# Таймауты
+TimeoutStartSec=30s
+TimeoutStopSec=30s
+
+# Ограничения ресурсов (опционально)
+# Максимум 1GB памяти
+MemoryLimit=1G
+# Максимум 50% CPU
+CPUQuota=50%
+
+# Логирование
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=dns-collector
+
+# Безопасность (опционально, раскомментируйте для усиления)
+# NoNewPrivileges=true
+# PrivateTmp=true
+# ProtectSystem=strict
+# ProtectHome=true
+# ReadWritePaths=/home/test/projects/dns-collector
+
+[Install]
+WantedBy=multi-user.target

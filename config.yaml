@@ -1,0 +1,15 @@
+server:
+  udp_port: 5353
+
+database:
+  domains_db: "data/domains.db"
+  stats_db: "data/stats.db"
+
+resolver:
+  interval_seconds: 10  # Period for DNS resolution task (10 seconds for testing)
+  max_resolv: 10  # Default max_resolv value for new domains
+  timeout_seconds: 5  # DNS query timeout
+  workers: 5  # Number of concurrent resolver workers
+
+logging:
+  level: "info"  # debug, info, warn, error

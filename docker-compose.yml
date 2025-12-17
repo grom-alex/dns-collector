@@ -1,0 +1,127 @@
+services:
+  dns-collector:
+    image: registry.gromas.ru/apps/dns-collector:latest
+    container_name: dns-collector
+
+    # Порты
+    ports:
+      - "5353:5353/udp"
+
+    # Volumes для хранения данных
+    volumes:
+      - ./data:/app/data
+      - ./config.yaml:/app/config.yaml:ro
+
+    # Переменные окружения (опционально)
+    environment:
+      - TZ=Europe/Moscow
+
+    # Restart policy
+    restart: unless-stopped
+
+    # Ограничения ресурсов
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+    # Логирование
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "sqlite3", "/app/data/domains.db", "SELECT 1;"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  web-api:
+    build:
+      context: ./web-api
+      dockerfile: Dockerfile
+    container_name: dns-collector-webapi
+
+    # Порты
+    ports:
+      - "8080:8080"
+
+    # Volumes для доступа к БД
+    volumes:
+      - ./data:/app/data:ro
+      - ./web-api/config:/app/config:ro
+
+    # Переменные окружения
+    environment:
+      - TZ=Europe/Moscow
+
+    # Restart policy
+    restart: unless-stopped
+
+    # Зависимости
+    depends_on:
+      - dns-collector
+
+    # Ограничения ресурсов
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+    # Логирование
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+# Для мониторинга можно добавить дополнительные сервисы:
+#
+#   prometheus:
+#     image: prom/prometheus:latest
+#     container_name: prometheus
+#     ports:
+#       - "9090:9090"
+#     volumes:
+#       - ./prometheus.yml:/etc/prometheus/prometheus.yml
+#       - prometheus_data:/prometheus
+#     command:
+#       - '--config.file=/etc/prometheus/prometheus.yml'
+#     restart: unless-stopped
+#
+#   grafana:
+#     image: grafana/grafana:latest
+#     container_name: grafana
+#     ports:
+#       - "3000:3000"
+#     volumes:
+#       - grafana_data:/var/lib/grafana
+#     environment:
+#       - GF_SECURITY_ADMIN_PASSWORD=admin
+#     restart: unless-stopped
+#     depends_on:
+#       - prometheus
+
+volumes:
+  prometheus_data:
+  grafana_data:

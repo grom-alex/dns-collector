@@ -1,0 +1,155 @@
+DNS Collector - Project Structure
+==================================
+
+Project Root: /home/test/projects/dns-collector/
+
+Directory Tree:
+===============
+
+dns-collector/
+│
+├── cmd/                            # Application entry points
+│   └── dns-collector/
+│       └── main.go                 # Main application file
+│
+├── internal/                       # Internal packages (not importable outside)
+│   ├── config/
+│   │   └── config.go               # Configuration loading and validation
+│   ├── database/
+│   │   └── database.go             # SQLite database operations
+│   ├── resolver/
+│   │   └── resolver.go             # DNS resolution worker pool
+│   └── server/
+│       └── udp.go                  # UDP server implementation
+│
+├── Configuration Files:
+│   ├── config.yaml                 # Application configuration
+│   ├── go.mod                      # Go module definition
+│   └── go.sum                      # Go dependencies checksums (auto-generated)
+│
+├── Deployment:
+│   ├── Dockerfile                  # Docker image definition
+│   ├── docker-compose.yml          # Docker Compose configuration
+│   ├── .dockerignore               # Docker build exclusions
+│   └── dns-collector.service       # systemd service unit file
+│
+├── Scripts & Tools:
+│   ├── Makefile                    # Build and run commands
+│   ├── test_client.py              # Python test client for UDP messages
+│   ├── monitor.sh                  # Database monitoring script
+│   └── queries.sql                 # Useful SQL queries for analysis
+│
+├── Documentation:
+│   ├── README.md                   # Main documentation and overview
+│   ├── INSTALL.md                  # Installation and setup guide
+│   ├── DOCKER.md                   # Docker deployment guide
+│   ├── ARCHITECTURE.md             # System architecture description
+│   ├── SUMMARY.md                  # Project summary
+│   └── PROJECT_STRUCTURE.txt       # This file
+│
+├── Generated at Runtime:
+│   ├── domains.db                  # SQLite database for domains and IPs
+│   ├── stats.db                    # SQLite database for statistics
+│   ├── build/                      # Build artifacts directory
+│   │   └── dns-collector           # Compiled binary
+│   └── data/                       # Docker volume mount point
+│
+└── Version Control:
+    ├── .gitignore                  # Git exclusions
+    └── .git/                       # Git repository (if initialized)
+
+
+File Descriptions:
+==================
+
+Source Code (Go):
+-----------------
+cmd/dns-collector/main.go          - Application entry point, initializes all components
+internal/config/config.go          - YAML configuration parsing and validation
+internal/database/database.go      - SQLite database schema and operations
+internal/server/udp.go             - UDP server for receiving DNS queries
+internal/resolver/resolver.go      - Periodic DNS resolver with worker pool
+
+Configuration:
+-------------
+config.yaml                        - Main configuration file (ports, intervals, paths)
+go.mod                             - Go module dependencies
+Makefile                           - Build automation (build, run, test, clean)
+
+Docker:
+-------
+Dockerfile                         - Multi-stage Docker build
+docker-compose.yml                 - Container orchestration
+.dockerignore                      - Files to exclude from Docker build
+dns-collector.service              - systemd service definition
+
+Scripts:
+--------
+test_client.py                     - Python script to send test UDP messages
+monitor.sh                         - Bash script to display database statistics
+queries.sql                        - Collection of useful SQL queries
+
+Documentation:
+--------------
+README.md                          - Quick start, features, usage examples
+INSTALL.md                         - Detailed installation instructions
+DOCKER.md                          - Docker deployment and operations
+ARCHITECTURE.md                    - System design and architecture
+SUMMARY.md                         - Project overview and summary
+PROJECT_STRUCTURE.txt              - This file
+
+
+Database Schema:
+================
+
+domains.db:
+-----------
+Table: domain
+  - id (INTEGER, PK, AUTOINCREMENT)
+  - domain (TEXT, UNIQUE, NOT NULL)
+  - time_insert (DATETIME, NOT NULL)
+  - resolv_count (INTEGER, NOT NULL, DEFAULT 0)
+  - max_resolv (INTEGER, NOT NULL)
+  - last_resolv_time (DATETIME, NOT NULL)
+
+Table: ip
+  - id (INTEGER, PK, AUTOINCREMENT)
+  - domain_id (INTEGER, FK to domain.id)
+  - ip (TEXT, NOT NULL)
+  - type (TEXT, NOT NULL)              # 'ipv4' or 'ipv6'
+  - time (DATETIME, NOT NULL)
+  - UNIQUE(domain_id, ip)
+
+stats.db:
+---------
+Table: domain_stat
+  - id (INTEGER, PK, AUTOINCREMENT)
+  - domain (TEXT, NOT NULL)
+  - client_ip (TEXT, NOT NULL)
+  - rtype (TEXT, NOT NULL)
+  - timestamp (DATETIME, NOT NULL)
+
+
+Key Features:
+=============
+✓ UDP server with configurable port
+✓ JSON message parsing
+✓ Dual SQLite databases (domains & statistics)
+✓ Periodic DNS resolution with worker pool
+✓ IPv4 and IPv6 support
+✓ Docker containerization
+✓ systemd integration
+✓ Comprehensive monitoring tools
+✓ Production-ready architecture
+
+
+Quick Commands:
+===============
+Build:          make build
+Run:            make run
+Test:           python3 test_client.py
+Monitor:        ./monitor.sh
+Docker Build:   docker build -t dns-collector .
+Docker Run:     docker-compose up -d
+Clean:          make clean
+
