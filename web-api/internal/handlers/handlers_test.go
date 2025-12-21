@@ -1,0 +1,277 @@
+package handlers
+
+import (
+	"encoding/json"
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"github.com/gin-gonic/gin"
+
+	"dns-collector-webapi/internal/models"
+)
+
+// MockDatabase implements database.DB interface for testing
+type MockDatabase struct {
+	GetStatsFunc       func(filter models.StatsFilter) ([]models.DomainStat, int64, error)
+	GetDomainsFunc     func(filter models.DomainsFilter) ([]models.Domain, int64, error)
+	GetDomainWithIPsFunc func(id int64) (*models.Domain, error)
+}
+
+func (m *MockDatabase) GetStats(filter models.StatsFilter) ([]models.DomainStat, int64, error) {
+	if m.GetStatsFunc != nil {
+		return m.GetStatsFunc(filter)
+	}
+	return nil, 0, nil
+}
+
+func (m *MockDatabase) GetDomains(filter models.DomainsFilter) ([]models.Domain, int64, error) {
+	if m.GetDomainsFunc != nil {
+		return m.GetDomainsFunc(filter)
+	}
+	return nil, 0, nil
+}
+
+func (m *MockDatabase) GetDomainWithIPs(id int64) (*models.Domain, error) {
+	if m.GetDomainWithIPsFunc != nil {
+		return m.GetDomainWithIPsFunc(id)
+	}
+	return nil, nil
+}
+
+func (m *MockDatabase) Close() error {
+	return nil
+}
+
+func setupTestRouter() (*gin.Engine, *MockDatabase) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	mockDB := &MockDatabase{}
+	return router, mockDB
+}
+
+func TestHealthCheck(t *testing.T) {
+	router, mockDB := setupTestRouter()
+	h := NewHandler(mockDB)
+	router.GET("/health", h.HealthCheck)
+
+	req, _ := http.NewRequest(http.MethodGet, "/health", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+
+	var response map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("Failed to parse response: %v", err)
+	}
+
+	if response["status"] != "ok" {
+		t.Errorf("Expected status=ok, got %v", response["status"])
+	}
+
+	if _, ok := response["time"]; !ok {
+		t.Error("Expected time field in response")
+	}
+}
+
+func TestGetStats_Success(t *testing.T) {
+	router, mockDB := setupTestRouter()
+
+	mockStats := []models.DomainStat{
+		{
+			ID:        1,
+			Domain:    "example.com",
+			ClientIP:  "192.168.1.1",
+			RType:     "A",
+			Timestamp: time.Now(),
+		},
+		{
+			ID:        2,
+			Domain:    "test.com",
+			ClientIP:  "192.168.1.2",
+			RType:     "AAAA",
+			Timestamp: time.Now(),
+		},
+	}
+
+	mockDB.GetStatsFunc = func(filter models.StatsFilter) ([]models.DomainStat, int64, error) {
+		return mockStats, 2, nil
+	}
+
+	h := NewHandler(mockDB)
+	router.GET("/api/stats", h.GetStats)
+
+	req, _ := http.NewRequest(http.MethodGet, "/api/stats", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+
+	var response models.PaginatedResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("Failed to parse response: %v", err)
+	}
+
+	if response.Total != 2 {
+		t.Errorf("Expected total=2, got %d", response.Total)
+	}
+
+	if response.Limit != 100 {
+		t.Errorf("Expected default limit=100, got %d", response.Limit)
+	}
+}
+
+func TestGetStats_WithPagination(t *testing.T) {
+	router, mockDB := setupTestRouter()
+
+	var capturedFilter models.StatsFilter
+	mockDB.GetStatsFunc = func(filter models.StatsFilter) ([]models.DomainStat, int64, error) {
+		capturedFilter = filter
+		return []models.DomainStat{}, 50, nil
+	}
+
+	h := NewHandler(mockDB)
+	router.GET("/api/stats", h.GetStats)
+
+	req, _ := http.NewRequest(http.MethodGet, "/api/stats?limit=20&offset=10", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+
+	if capturedFilter.Limit != 20 {
+		t.Errorf("Expected limit=20, got %d", capturedFilter.Limit)
+	}
+
+	if capturedFilter.Offset != 10 {
+		t.Errorf("Expected offset=10, got %d", capturedFilter.Offset)
+	}
+
+	var response models.PaginatedResponse
+	json.Unmarshal(w.Body.Bytes(), &response)
+
+	// Total pages should be ceil(50 / 20) = 3
+	if response.TotalPages != 3 {
+		t.Errorf("Expected total_pages=3, got %d", response.TotalPages)
+	}
+}
+
+func TestGetStats_DatabaseError(t *testing.T) {
+	router, mockDB := setupTestRouter()
+
+	mockDB.GetStatsFunc = func(filter models.StatsFilter) ([]models.DomainStat, int64, error) {
+		return nil, 0, errors.New("database connection failed")
+	}
+
+	h := NewHandler(mockDB)
+	router.GET("/api/stats", h.GetStats)
+
+	req, _ := http.NewRequest(http.MethodGet, "/api/stats", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("Expected status 500, got %d", w.Code)
+	}
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+
+	if _, ok := response["error"]; !ok {
+		t.Error("Expected error field in response")
+	}
+}
+
+func TestGetDomainByID_Success(t *testing.T) {
+	router, mockDB := setupTestRouter()
+
+	mockDomain := &models.Domain{
+		ID:             1,
+		Domain:         "example.com",
+		TimeInsert:     time.Now(),
+		ResolvCount:    5,
+		MaxResolv:      10,
+		LastResolvTime: time.Now(),
+		IPs: []models.IP{
+			{ID: 1, DomainID: 1, IP: "192.168.1.1", Type: "A", Time: time.Now()},
+		},
+	}
+
+	mockDB.GetDomainWithIPsFunc = func(id int64) (*models.Domain, error) {
+		if id == 1 {
+			return mockDomain, nil
+		}
+		return nil, errors.New("domain not found")
+	}
+
+	h := NewHandler(mockDB)
+	router.GET("/api/domains/:id", h.GetDomainByID)
+
+	req, _ := http.NewRequest(http.MethodGet, "/api/domains/1", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+
+	var response models.Domain
+	json.Unmarshal(w.Body.Bytes(), &response)
+
+	if response.Domain != "example.com" {
+		t.Errorf("Expected domain=example.com, got %s", response.Domain)
+	}
+
+	if len(response.IPs) != 1 {
+		t.Errorf("Expected 1 IP, got %d", len(response.IPs))
+	}
+}
+
+func TestGetDomainByID_InvalidID(t *testing.T) {
+	router, mockDB := setupTestRouter()
+	h := NewHandler(mockDB)
+	router.GET("/api/domains/:id", h.GetDomainByID)
+
+	req, _ := http.NewRequest(http.MethodGet, "/api/domains/invalid", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("Expected status 400, got %d", w.Code)
+	}
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+
+	if response["error"] != "invalid domain ID" {
+		t.Errorf("Expected 'invalid domain ID' error, got %v", response["error"])
+	}
+}
+
+func TestGetDomainByID_NotFound(t *testing.T) {
+	router, mockDB := setupTestRouter()
+
+	mockDB.GetDomainWithIPsFunc = func(id int64) (*models.Domain, error) {
+		return nil, errors.New("domain not found")
+	}
+
+	h := NewHandler(mockDB)
+	router.GET("/api/domains/:id", h.GetDomainByID)
+
+	req, _ := http.NewRequest(http.MethodGet, "/api/domains/999", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("Expected status 404, got %d", w.Code)
+	}
+}

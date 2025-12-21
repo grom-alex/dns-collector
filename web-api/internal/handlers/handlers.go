@@ -15,10 +15,10 @@ import (
 )
 
 type Handler struct {
-	db *database.Database
+	db database.DB
 }
 
-func NewHandler(db *database.Database) *Handler {
+func NewHandler(db database.DB) *Handler {
 	return &Handler{db: db}
 }
 
