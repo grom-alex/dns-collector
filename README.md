@@ -14,7 +14,7 @@
 
 ### dns-collector
 - UDP сервер для приема DNS запросов в JSON формате
-- Хранение доменных имен в SQLite
+- Хранение доменных имен и статистики в PostgreSQL
 - Периодический резолвинг доменов в IP адреса (IPv4 и IPv6)
 - Сбор статистики по запросам
 - Настраиваемые параметры через конфигурационный файл
@@ -29,12 +29,26 @@
 ## Быстрый старт
 
 ```bash
-# Запуск всех сервисов
+# Запуск всех сервисов (PostgreSQL, dns-collector, web-api)
 docker-compose up -d
+
+# Проверка статуса
+docker-compose ps
+
+# Просмотр логов
+docker-compose logs -f
 
 # Web-интерфейс доступен по адресу
 http://localhost:8080
+
+# Health-check API
+curl http://localhost:8080/health
 ```
+
+**Системные требования:**
+- Docker и Docker Compose
+- Порты 5353/udp (DNS collector), 8080 (Web UI), 5432 (PostgreSQL)
+- Минимум 1GB RAM
 
 Подробнее: [QUICKSTART_WEBAPI.md](QUICKSTART_WEBAPI.md)
 
@@ -63,8 +77,12 @@ server:
   udp_port: 5353
 
 database:
-  domains_db: "domains.db"
-  stats_db: "stats.db"
+  host: "postgres"       # Хост PostgreSQL
+  port: 5432            # Порт PostgreSQL
+  user: "dns_collector" # Пользователь БД
+  password: "dns_collector_pass"  # Пароль БД
+  database: "dns_collector"       # Название БД
+  ssl_mode: "disable"   # Режим SSL (disable/require)
 
 resolver:
   interval_seconds: 300  # Период резолвинга (5 минут)
@@ -73,7 +91,7 @@ resolver:
   workers: 5           # Количество параллельных воркеров
 
 logging:
-  level: "info"
+  level: "info"  # Уровень логирования (debug, info, warn, error)
 ```
 
 ## Запуск
@@ -119,31 +137,29 @@ python3 test_client.py
 
 ## Структура базы данных
 
-### domains.db
+Система использует PostgreSQL для хранения всех данных.
 
 **Таблица `domain`:**
-- `id` - уникальный идентификатор
-- `domain` - доменное имя (уникальное)
-- `time_insert` - время вставки записи
-- `resolv_count` - счетчик резолвингов
-- `max_resolv` - максимальное количество резолвингов
-- `last_resolv_time` - время последнего резолвинга
+- `id` - уникальный идентификатор (SERIAL PRIMARY KEY)
+- `domain` - доменное имя (VARCHAR UNIQUE)
+- `time_insert` - время вставки записи (TIMESTAMP)
+- `resolv_count` - счетчик резолвингов (INTEGER)
+- `max_resolv` - максимальное количество резолвингов (INTEGER)
+- `last_resolv_time` - время последнего резолвинга (TIMESTAMP)
 
 **Таблица `ip`:**
-- `id` - уникальный идентификатор
-- `domain_id` - связь с таблицей domain
-- `ip` - IP адрес
-- `type` - тип адреса (ipv4/ipv6)
-- `time` - время вставки/обновления
-
-### stats.db
+- `id` - уникальный идентификатор (SERIAL PRIMARY KEY)
+- `domain_id` - связь с таблицей domain (INTEGER REFERENCES domain(id))
+- `ip` - IP адрес (VARCHAR)
+- `type` - тип адреса (VARCHAR: 'ipv4' или 'ipv6')
+- `time` - время вставки/обновления (TIMESTAMP)
 
 **Таблица `domain_stat`:**
-- `id` - уникальный идентификатор
-- `domain` - доменное имя
-- `client_ip` - IP клиента
-- `rtype` - тип резолвинга
-- `timestamp` - время запроса
+- `id` - уникальный идентификатор (SERIAL PRIMARY KEY)
+- `domain` - доменное имя (VARCHAR)
+- `client_ip` - IP клиента (VARCHAR)
+- `rtype` - тип резолвинга (VARCHAR)
+- `timestamp` - время запроса (TIMESTAMP)
 
 ## Логика работы
 
@@ -157,10 +173,35 @@ python3 test_client.py
    - Обновляется счетчик `resolv_count` и время `last_resolv_time`
 5. Резолвинг прекращается когда `resolv_count` достигает `max_resolv`
 
+## Production Deployment
+
+Для production окружения используйте конфигурацию из `deploy/production/`:
+
+```bash
+cd deploy/production
+
+# Настройте переменные окружения
+cp .env.example .env
+nano .env
+
+# Запустите сервисы
+docker-compose up -d
+```
+
+**Особенности production конфигурации:**
+- `pull_policy: always` - автоматическое обновление образов
+- Ротация логов (max-size: 50m, max-file: 5)
+- Увеличенные лимиты ресурсов
+- SSL режим для PostgreSQL (опционально)
+- Healthcheck для всех сервисов
+
+Подробнее: [DEPLOYMENT.md](DEPLOYMENT.md)
+
 ## Документация
 
 ### Общая
 - [QUICKSTART_WEBAPI.md](QUICKSTART_WEBAPI.md) - быстрый старт с веб-интерфейсом
+- [DEPLOYMENT.md](DEPLOYMENT.md) - production развертывание
 - [SERVICES.md](SERVICES.md) - архитектура микросервисов
 - [CHANGELOG.md](CHANGELOG.md) - история изменений
 
@@ -176,16 +217,24 @@ python3 test_client.py
 - [web-api/INSTALL.md](web-api/INSTALL.md) - установка и отладка web-api
 - [web-api/FEATURES.md](web-api/FEATURES.md) - возможности API
 
-## Скриншоты
+## Возможности Web UI
 
 ### Статистика DNS запросов
-- Фильтрация по IP клиента и подсети
+- Фильтрация по IP клиента и подсети (с поддержкой CIDR)
 - Фильтрация по диапазону дат
 - Сортировка по любому полю
-- Пагинация
+- Пагинация с корректным подсчетом результатов
+- Применение фильтров по нажатию Enter
 
 ### Просмотр доменов
-- Поиск по регулярным выражениям
-- Просмотр всех зарезолвленных IP адресов
-- Разделение IPv4/IPv6
+- Поиск по регулярным выражениям (PostgreSQL regex)
+- Просмотр всех зарезолвленных IP адресов под строкой домена
+- Компактная таблица IP адресов с цветовой кодировкой (IPv4/IPv6)
 - Фильтрация по датам
+- Пагинация отфильтрованных результатов
+
+### API Endpoints
+- `GET /api/stats` - статистика DNS запросов
+- `GET /api/domains` - список доменов
+- `GET /api/domains/:id` - детали домена с IP адресами
+- `GET /health` - health-check endpoint
