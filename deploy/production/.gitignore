@@ -3,6 +3,7 @@
 
 # Backup files
 *.sql
+!migrations/*.sql
 *.tar.gz
 *.backup
 

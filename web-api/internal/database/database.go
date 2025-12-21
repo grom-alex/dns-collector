@@ -164,6 +164,24 @@ func (db *Database) GetDomains(filter models.DomainsFilter) ([]models.Domain, in
 
 	// Apply domain regex filter in SQL
 	if filter.DomainRegex != "" {
+		// Validate regex pattern to prevent ReDoS attacks
+		if len(filter.DomainRegex) > 200 {
+			return nil, 0, fmt.Errorf("regex pattern too long (max 200 characters)")
+		}
+
+		// Check for potentially dangerous patterns
+		dangerousPatterns := []string{
+			"(.*)*",    // Catastrophic backtracking
+			"(.+)+",    // Catastrophic backtracking
+			"(.*)+",    // Catastrophic backtracking
+			"(.+)*",    // Catastrophic backtracking
+		}
+		for _, dangerous := range dangerousPatterns {
+			if strings.Contains(filter.DomainRegex, dangerous) {
+				return nil, 0, fmt.Errorf("regex pattern contains potentially dangerous construct: %s", dangerous)
+			}
+		}
+
 		query += fmt.Sprintf(" AND domain ~ $%d", argPos)
 		countQuery += fmt.Sprintf(" AND domain ~ $%d", argPos)
 		argPos++
