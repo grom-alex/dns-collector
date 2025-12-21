@@ -227,7 +227,19 @@ export default {
           totalPages: response.data.total_pages || 0
         }
       } catch (err) {
-        error.value = err.response?.data?.error || err.message
+        console.error('Failed to load domains:', err)
+        if (err.response?.data?.error) {
+          // Server returned an error message
+          error.value = `Ошибка сервера: ${err.response.data.error}`
+        } else if (err.response?.status === 404) {
+          error.value = 'API endpoint не найден. Проверьте конфигурацию сервера.'
+        } else if (err.response?.status >= 500) {
+          error.value = 'Ошибка сервера. Попробуйте позже или обратитесь к администратору.'
+        } else if (err.message.includes('Network Error')) {
+          error.value = 'Ошибка сети. Проверьте подключение к серверу.'
+        } else {
+          error.value = `Не удалось загрузить домены: ${err.message}`
+        }
       } finally {
         loading.value = false
       }
