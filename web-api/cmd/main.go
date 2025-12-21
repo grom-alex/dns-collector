@@ -106,6 +106,13 @@ func main() {
 
 	log.Println("Database connected successfully")
 
+	// Run database migrations
+	log.Println("Running database migrations...")
+	if err := db.RunMigrations(); err != nil {
+		log.Fatalf("Failed to run migrations: %v", err)
+	}
+	log.Println("Migrations completed successfully")
+
 	// Initialize handlers
 	h := handlers.NewHandler(db)
 

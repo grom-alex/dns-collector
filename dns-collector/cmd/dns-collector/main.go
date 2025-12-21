@@ -42,6 +42,13 @@ func main() {
 
 	log.Println("Database connected successfully")
 
+	// Run database migrations
+	log.Println("Running database migrations...")
+	if err := db.RunMigrations(); err != nil {
+		log.Fatalf("Failed to run migrations: %v", err)
+	}
+	log.Println("Migrations completed successfully")
+
 	// Create and start UDP server
 	udpServer := server.NewUDPServer(cfg, db)
 	if err := udpServer.Start(); err != nil {

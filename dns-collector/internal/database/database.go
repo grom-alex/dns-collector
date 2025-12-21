@@ -9,7 +9,17 @@ import (
 )
 
 type Database struct {
-	DB *sql.DB
+	DB     *sql.DB
+	config *dbConfig
+}
+
+type dbConfig struct {
+	Host     string
+	Port     int
+	User     string
+	Password string
+	Database string
+	SSLMode  string
 }
 
 type Domain struct {
@@ -38,6 +48,15 @@ type DomainStat struct {
 }
 
 func New(host string, port int, user, password, dbname, sslmode string) (*Database, error) {
+	config := &dbConfig{
+		Host:     host,
+		Port:     port,
+		User:     user,
+		Password: password,
+		Database: dbname,
+		SSLMode:  sslmode,
+	}
+
 	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		host, port, user, password, dbname, sslmode)
 
@@ -57,7 +76,10 @@ func New(host string, port int, user, password, dbname, sslmode string) (*Databa
 	db.SetMaxIdleConns(5)
 	db.SetConnMaxLifetime(5 * time.Minute)
 
-	database := &Database{DB: db}
+	database := &Database{
+		DB:     db,
+		config: config,
+	}
 
 	if err := database.initSchema(); err != nil {
 		db.Close()
