@@ -32,9 +32,8 @@ CREATE INDEX IF NOT EXISTS idx_domain_stat_time_client ON domain_stat(timestamp 
 CREATE INDEX IF NOT EXISTS idx_domain_stat_time_domain ON domain_stat(timestamp DESC, domain);
 
 -- Partial index for recent stats (last 30 days)
-CREATE INDEX IF NOT EXISTS idx_domain_stat_recent ON domain_stat(timestamp DESC, client_ip)
-    WHERE timestamp > NOW() - INTERVAL '30 days';
+-- Note: Cannot use NOW() in WHERE clause as it's not IMMUTABLE
+-- Instead, use this index for all timestamp queries and let PostgreSQL optimize
 
 -- Comments
 COMMENT ON INDEX idx_domain_resolv_lookup IS 'Optimizes resolver worker queries for domains needing resolution';
-COMMENT ON INDEX idx_domain_stat_recent IS 'Partial index for recent statistics queries (last 30 days)';
