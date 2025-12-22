@@ -275,3 +275,164 @@ func TestGetDomainByID_NotFound(t *testing.T) {
 		t.Errorf("Expected status 404, got %d", w.Code)
 	}
 }
+
+func TestGetStats_WithClientIPs(t *testing.T) {
+	router, mockDB := setupTestRouter()
+
+	var capturedFilter models.StatsFilter
+	mockDB.GetStatsFunc = func(filter models.StatsFilter) ([]models.DomainStat, int64, error) {
+		capturedFilter = filter
+		return []models.DomainStat{}, 0, nil
+	}
+
+	h := NewHandler(mockDB)
+	router.GET("/api/stats", h.GetStats)
+
+	req, _ := http.NewRequest(http.MethodGet, "/api/stats?client_ips=192.168.1.1,192.168.1.2", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+
+	if len(capturedFilter.ClientIPs) != 2 {
+		t.Errorf("Expected 2 client IPs, got %d", len(capturedFilter.ClientIPs))
+	}
+}
+
+func TestGetStats_WithSubnet(t *testing.T) {
+	router, mockDB := setupTestRouter()
+
+	var capturedFilter models.StatsFilter
+	mockDB.GetStatsFunc = func(filter models.StatsFilter) ([]models.DomainStat, int64, error) {
+		capturedFilter = filter
+		return []models.DomainStat{}, 0, nil
+	}
+
+	h := NewHandler(mockDB)
+	router.GET("/api/stats", h.GetStats)
+
+	req, _ := http.NewRequest(http.MethodGet, "/api/stats?subnet=192.168.1.0/24", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+
+	if capturedFilter.Subnet != "192.168.1.0/24" {
+		t.Errorf("Expected subnet=192.168.1.0/24, got %s", capturedFilter.Subnet)
+	}
+}
+
+
+func TestGetStats_WithSorting(t *testing.T) {
+	router, mockDB := setupTestRouter()
+
+	var capturedFilter models.StatsFilter
+	mockDB.GetStatsFunc = func(filter models.StatsFilter) ([]models.DomainStat, int64, error) {
+		capturedFilter = filter
+		return []models.DomainStat{}, 0, nil
+	}
+
+	h := NewHandler(mockDB)
+	router.GET("/api/stats", h.GetStats)
+
+	req, _ := http.NewRequest(http.MethodGet, "/api/stats?sort_by=domain&sort_order=asc", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+
+	if capturedFilter.SortBy != "domain" {
+		t.Errorf("Expected sort_by=domain, got %s", capturedFilter.SortBy)
+	}
+
+	if capturedFilter.SortOrder != "asc" {
+		t.Errorf("Expected sort_order=asc, got %s", capturedFilter.SortOrder)
+	}
+}
+
+func TestGetDomains_Success(t *testing.T) {
+	router, mockDB := setupTestRouter()
+
+	mockDomains := []models.Domain{
+		{
+			ID:             1,
+			Domain:         "example.com",
+			TimeInsert:     time.Now(),
+			ResolvCount:    5,
+			MaxResolv:      10,
+			LastResolvTime: time.Now(),
+		},
+	}
+
+	mockDB.GetDomainsFunc = func(filter models.DomainsFilter) ([]models.Domain, int64, error) {
+		return mockDomains, 1, nil
+	}
+
+	h := NewHandler(mockDB)
+	router.GET("/api/domains", h.GetDomains)
+
+	req, _ := http.NewRequest(http.MethodGet, "/api/domains", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+
+	var response models.PaginatedResponse
+	json.Unmarshal(w.Body.Bytes(), &response)
+
+	if response.Total != 1 {
+		t.Errorf("Expected total=1, got %d", response.Total)
+	}
+}
+
+func TestGetDomains_WithDomainRegex(t *testing.T) {
+	router, mockDB := setupTestRouter()
+
+	var capturedFilter models.DomainsFilter
+	mockDB.GetDomainsFunc = func(filter models.DomainsFilter) ([]models.Domain, int64, error) {
+		capturedFilter = filter
+		return []models.Domain{}, 0, nil
+	}
+
+	h := NewHandler(mockDB)
+	router.GET("/api/domains", h.GetDomains)
+
+	req, _ := http.NewRequest(http.MethodGet, "/api/domains?domain_regex=^example", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+
+	if capturedFilter.DomainRegex != "^example" {
+		t.Errorf("Expected domain_regex=^example, got %s", capturedFilter.DomainRegex)
+	}
+}
+
+func TestGetDomains_DatabaseError(t *testing.T) {
+	router, mockDB := setupTestRouter()
+
+	mockDB.GetDomainsFunc = func(filter models.DomainsFilter) ([]models.Domain, int64, error) {
+		return nil, 0, errors.New("database error")
+	}
+
+	h := NewHandler(mockDB)
+	router.GET("/api/domains", h.GetDomains)
+
+	req, _ := http.NewRequest(http.MethodGet, "/api/domains", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("Expected status 500, got %d", w.Code)
+	}
+}
