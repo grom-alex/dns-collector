@@ -1,0 +1,23 @@
+run:
+  timeout: 5m
+  skip-dirs:
+    - tools
+
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+linters:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - typecheck
+    - unused
+
+output:
+  formats:
+    - format: colored-line-number
