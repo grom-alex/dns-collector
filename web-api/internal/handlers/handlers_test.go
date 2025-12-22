@@ -444,3 +444,149 @@ func TestGetDomains_DatabaseError(t *testing.T) {
 		t.Errorf("Expected status 500, got %d", w.Code)
 	}
 }
+
+func TestExportList_Success(t *testing.T) {
+	router, mockDB := setupTestRouter()
+
+	mockDB.GetExportListFunc = func(domainRegex string) (*models.ExportList, error) {
+		return &models.ExportList{
+			Domains: []string{"example.com", "test.com"},
+			IPv4:    []string{"192.0.2.1", "192.0.2.2"},
+			IPv6:    []string{"2001:db8::1", "2001:db8::2"},
+		}, nil
+	}
+
+	h := NewHandler(mockDB)
+	router.GET("/export/test", func(c *gin.Context) {
+		h.ExportList(c, ".*", true)
+	})
+
+	req, _ := http.NewRequest(http.MethodGet, "/export/test", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+
+	contentType := w.Header().Get("Content-Type")
+	if contentType != "text/plain; charset=utf-8" {
+		t.Errorf("Expected Content-Type 'text/plain; charset=utf-8', got '%s'", contentType)
+	}
+
+	expected := "example.com\ntest.com\n192.0.2.1\n192.0.2.2\n2001:db8::1\n2001:db8::2\n"
+	if w.Body.String() != expected {
+		t.Errorf("Expected body:\n%s\nGot:\n%s", expected, w.Body.String())
+	}
+}
+
+func TestExportList_IPsOnly(t *testing.T) {
+	router, mockDB := setupTestRouter()
+
+	mockDB.GetExportListFunc = func(domainRegex string) (*models.ExportList, error) {
+		return &models.ExportList{
+			Domains: []string{"example.com", "test.com"},
+			IPv4:    []string{"192.0.2.1"},
+			IPv6:    []string{"2001:db8::1"},
+		}, nil
+	}
+
+	h := NewHandler(mockDB)
+	router.GET("/export/ips", func(c *gin.Context) {
+		h.ExportList(c, ".*", false) // include_domains = false
+	})
+
+	req, _ := http.NewRequest(http.MethodGet, "/export/ips", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+
+	// Domains should NOT be included
+	expected := "192.0.2.1\n2001:db8::1\n"
+	if w.Body.String() != expected {
+		t.Errorf("Expected body:\n%s\nGot:\n%s", expected, w.Body.String())
+	}
+}
+
+func TestExportList_EmptyResults(t *testing.T) {
+	router, mockDB := setupTestRouter()
+
+	mockDB.GetExportListFunc = func(domainRegex string) (*models.ExportList, error) {
+		return &models.ExportList{
+			Domains: []string{},
+			IPv4:    []string{},
+			IPv6:    []string{},
+		}, nil
+	}
+
+	h := NewHandler(mockDB)
+	router.GET("/export/empty", func(c *gin.Context) {
+		h.ExportList(c, "^nomatch$", true)
+	})
+
+	req, _ := http.NewRequest(http.MethodGet, "/export/empty", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+
+	if w.Body.String() != "" {
+		t.Errorf("Expected empty body, got: %s", w.Body.String())
+	}
+}
+
+func TestExportList_DatabaseError(t *testing.T) {
+	router, mockDB := setupTestRouter()
+
+	mockDB.GetExportListFunc = func(domainRegex string) (*models.ExportList, error) {
+		return nil, errors.New("database connection failed")
+	}
+
+	h := NewHandler(mockDB)
+	router.GET("/export/error", func(c *gin.Context) {
+		h.ExportList(c, ".*", true)
+	})
+
+	req, _ := http.NewRequest(http.MethodGet, "/export/error", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("Expected status 500, got %d", w.Code)
+	}
+}
+
+func TestExportList_OnlyIPv4(t *testing.T) {
+	router, mockDB := setupTestRouter()
+
+	mockDB.GetExportListFunc = func(domainRegex string) (*models.ExportList, error) {
+		return &models.ExportList{
+			Domains: []string{},
+			IPv4:    []string{"192.0.2.1", "192.0.2.2"},
+			IPv6:    []string{},
+		}, nil
+	}
+
+	h := NewHandler(mockDB)
+	router.GET("/export/ipv4", func(c *gin.Context) {
+		h.ExportList(c, ".*", false)
+	})
+
+	req, _ := http.NewRequest(http.MethodGet, "/export/ipv4", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+
+	expected := "192.0.2.1\n192.0.2.2\n"
+	if w.Body.String() != expected {
+		t.Errorf("Expected body:\n%s\nGot:\n%s", expected, w.Body.String())
+	}
+}

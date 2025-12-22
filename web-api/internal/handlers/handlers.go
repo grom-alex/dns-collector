@@ -188,6 +188,11 @@ func (h *Handler) ExportList(c *gin.Context, domainRegex string, includeDomains 
 		return
 	}
 
+	// Log if export list is empty (useful for debugging)
+	if len(exportList.Domains) == 0 && len(exportList.IPv4) == 0 && len(exportList.IPv6) == 0 {
+		log.Printf("Export list returned empty results for regex: %s", domainRegex)
+	}
+
 	// Build plain text response
 	var result strings.Builder
 
@@ -211,7 +216,8 @@ func (h *Handler) ExportList(c *gin.Context, domainRegex string, includeDomains 
 		result.WriteString("\n")
 	}
 
-	// Return as plain text
+	// Return as plain text with caching headers
 	c.Header("Content-Type", "text/plain; charset=utf-8")
+	c.Header("Cache-Control", "public, max-age=300") // 5 minutes cache
 	c.String(http.StatusOK, result.String())
 }

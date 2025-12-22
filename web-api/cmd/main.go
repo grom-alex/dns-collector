@@ -104,8 +104,8 @@ func validateExportLists(lists []ExportListConfig) error {
 		}
 		endpoints[list.Endpoint] = true
 
-		// Validate endpoint starts with /
-		if list.Endpoint[0] != '/' {
+		// Validate endpoint starts with / (defensive check for length)
+		if len(list.Endpoint) == 0 || list.Endpoint[0] != '/' {
 			return fmt.Errorf("export list '%s': endpoint must start with /", list.Name)
 		}
 	}
