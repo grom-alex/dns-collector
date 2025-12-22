@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -450,7 +451,7 @@ func TestExportList_Success(t *testing.T) {
 
 	mockDB.GetExportListFunc = func(domainRegex string) (*models.ExportList, error) {
 		return &models.ExportList{
-			Domains: []string{"example.com", "test.com"},
+			Domains: []string{"example.com.", "test.com."}, // Domains with trailing dots (FQDN format from DB)
 			IPv4:    []string{"192.0.2.1", "192.0.2.2"},
 			IPv6:    []string{"2001:db8::1", "2001:db8::2"},
 		}, nil
@@ -474,6 +475,7 @@ func TestExportList_Success(t *testing.T) {
 		t.Errorf("Expected Content-Type 'text/plain; charset=utf-8', got '%s'", contentType)
 	}
 
+	// Expected output should NOT have trailing dots
 	expected := "example.com\ntest.com\n192.0.2.1\n192.0.2.2\n2001:db8::1\n2001:db8::2\n"
 	if w.Body.String() != expected {
 		t.Errorf("Expected body:\n%s\nGot:\n%s", expected, w.Body.String())
@@ -588,5 +590,52 @@ func TestExportList_OnlyIPv4(t *testing.T) {
 	expected := "192.0.2.1\n192.0.2.2\n"
 	if w.Body.String() != expected {
 		t.Errorf("Expected body:\n%s\nGot:\n%s", expected, w.Body.String())
+	}
+}
+
+func TestExportList_RemoveTrailingDot(t *testing.T) {
+	router, mockDB := setupTestRouter()
+
+	mockDB.GetExportListFunc = func(domainRegex string) (*models.ExportList, error) {
+		return &models.ExportList{
+			// Domains in FQDN format with trailing dots (as stored in DB)
+			Domains: []string{
+				"gecko16-normal-c-useast1a.tiktokv.com.",
+				"gecko16-platform-ycru.tiktokv.com.",
+				"gecko31-normal-useast1a.tiktokv.com.",
+			},
+			IPv4: []string{},
+			IPv6: []string{},
+		}, nil
+	}
+
+	h := NewHandler(mockDB)
+	router.GET("/export/trailing", func(c *gin.Context) {
+		h.ExportList(c, ".*", true)
+	})
+
+	req, _ := http.NewRequest(http.MethodGet, "/export/trailing", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+
+	// Expected output without trailing dots
+	expected := "gecko16-normal-c-useast1a.tiktokv.com\n" +
+		"gecko16-platform-ycru.tiktokv.com\n" +
+		"gecko31-normal-useast1a.tiktokv.com\n"
+
+	if w.Body.String() != expected {
+		t.Errorf("Expected body:\n%s\nGot:\n%s", expected, w.Body.String())
+	}
+
+	// Explicitly verify no trailing dots
+	lines := strings.Split(strings.TrimSpace(w.Body.String()), "\n")
+	for i, line := range lines {
+		if strings.HasSuffix(line, ".") {
+			t.Errorf("Line %d still has trailing dot: %s", i+1, line)
+		}
 	}
 }

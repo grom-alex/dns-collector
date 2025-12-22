@@ -199,6 +199,8 @@ func (h *Handler) ExportList(c *gin.Context, domainRegex string, includeDomains 
 	// Add domains if enabled
 	if includeDomains {
 		for _, domain := range exportList.Domains {
+			// Remove trailing dot from FQDN if present
+			domain = strings.TrimSuffix(domain, ".")
 			result.WriteString(domain)
 			result.WriteString("\n")
 		}
