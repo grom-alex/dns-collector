@@ -1,4 +1,4 @@
-.PHONY: build run clean test deps
+.PHONY: build run clean test deps lint test-unit test-coverage
 
 # Название бинарника
 BINARY_NAME=dns-collector
@@ -39,6 +39,23 @@ test:
 	@echo "Running test client..."
 	python3 test_client.py
 
+# Unit тесты
+test-unit:
+	@echo "Running unit tests..."
+	go test -v -race ./internal/... ./cmd/...
+
+# Покрытие тестами
+test-coverage:
+	@echo "Running tests with coverage..."
+	go test -coverprofile=coverage.out ./internal/... ./cmd/...
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report: coverage.html"
+
+# Линтер
+lint:
+	@echo "Running golangci-lint..."
+	golangci-lint run --timeout=5m
+
 # Сборка для разных платформ
 build-linux:
 	@echo "Building for Linux..."
@@ -61,11 +78,14 @@ build-all: build-linux build-windows build-macos
 # Помощь
 help:
 	@echo "Available targets:"
-	@echo "  make build        - Build the application"
-	@echo "  make run          - Build and run the application"
-	@echo "  make run-config   - Run with custom config (use CONFIG=/path/to/config.yaml)"
-	@echo "  make deps         - Download dependencies"
-	@echo "  make clean        - Clean build artifacts and databases"
-	@echo "  make test         - Run test client"
-	@echo "  make build-all    - Build for all platforms"
-	@echo "  make help         - Show this help"
+	@echo "  make build         - Build the application"
+	@echo "  make run           - Build and run the application"
+	@echo "  make run-config    - Run with custom config (use CONFIG=/path/to/config.yaml)"
+	@echo "  make deps          - Download dependencies"
+	@echo "  make clean         - Clean build artifacts and databases"
+	@echo "  make test          - Run test client"
+	@echo "  make test-unit     - Run unit tests"
+	@echo "  make test-coverage - Run tests with coverage report"
+	@echo "  make lint          - Run golangci-lint"
+	@echo "  make build-all     - Build for all platforms"
+	@echo "  make help          - Show this help"

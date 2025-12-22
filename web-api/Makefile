@@ -1,4 +1,4 @@
-.PHONY: help dev build clean install test docker-build docker-run
+.PHONY: help dev build clean install test test-unit test-coverage lint docker-build docker-run
 
 help:
 	@echo "DNS Collector Web API - Makefile commands:"
@@ -17,9 +17,14 @@ help:
 	@echo "  make docker-build     - Build Docker image"
 	@echo "  make docker-run       - Run Docker container"
 	@echo ""
+	@echo "Testing:"
+	@echo "  make test             - Run all tests (backend + frontend)"
+	@echo "  make test-unit        - Run backend unit tests"
+	@echo "  make test-coverage    - Run backend tests with coverage"
+	@echo "  make lint             - Run golangci-lint"
+	@echo ""
 	@echo "Other:"
 	@echo "  make clean            - Clean build artifacts"
-	@echo "  make test             - Run tests"
 
 # Development
 dev:
@@ -64,3 +69,20 @@ clean:
 test:
 	go test ./...
 	cd frontend && npm run test
+
+# Unit tests (backend only)
+test-unit:
+	@echo "Running backend unit tests..."
+	go test -v -race ./internal/... ./cmd/...
+
+# Coverage
+test-coverage:
+	@echo "Running tests with coverage..."
+	go test -coverprofile=coverage.out ./internal/... ./cmd/...
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report: coverage.html"
+
+# Lint
+lint:
+	@echo "Running golangci-lint..."
+	golangci-lint run --timeout=5m
