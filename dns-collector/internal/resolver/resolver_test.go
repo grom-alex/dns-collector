@@ -121,6 +121,9 @@ func TestResolveCNAME(t *testing.T) {
 	}
 
 	resolver := NewResolver(cfg, nil)
+	if resolver.dnsConf == nil {
+		t.Fatal("Expected dnsConf to be initialized")
+	}
 
 	// Test with a real CNAME (this might fail in offline environments)
 	cname, err := resolver.resolveCNAME("www.github.com")
@@ -163,12 +166,9 @@ func TestResolveCNAME_Timeout(t *testing.T) {
 	defer cancel()
 
 	_, err := resolver.dnsConf.LookupCNAME(ctx, "example.com")
-	if err == nil {
-		// Context should have timed out
-		if ctx.Err() == context.DeadlineExceeded {
-			// Expected timeout
-		}
-	}
+	// The call should timeout or fail due to the custom dialer delay
+	// We're just testing that the timeout mechanism works, not asserting specific behavior
+	_ = err
 }
 
 func TestStopChannel(t *testing.T) {

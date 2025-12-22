@@ -66,11 +66,11 @@ webapi:
 
 func TestLoad_EnvVariableOverride(t *testing.T) {
 	// Set environment variables
-	os.Setenv("POSTGRES_PASSWORD", "env_password")
-	os.Setenv("POSTGRES_SSL_MODE", "require")
+	_ = os.Setenv("POSTGRES_PASSWORD", "env_password")
+	_ = os.Setenv("POSTGRES_SSL_MODE", "require")
 	defer func() {
-		os.Unsetenv("POSTGRES_PASSWORD")
-		os.Unsetenv("POSTGRES_SSL_MODE")
+		_ = os.Unsetenv("POSTGRES_PASSWORD")
+		_ = os.Unsetenv("POSTGRES_SSL_MODE")
 	}()
 
 	// Create temporary config file

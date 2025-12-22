@@ -197,7 +197,7 @@ func (db *Database) GetDomainsToResolve(limit int) ([]Domain, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to query domains: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var domains []Domain
 	for rows.Next() {

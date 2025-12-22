@@ -13,7 +13,7 @@ func TestInsertOrGetDomain_NewDomain(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	database := &Database{DB: db}
 	now := time.Now()
@@ -50,7 +50,7 @@ func TestInsertOrGetDomain_ExistingDomain(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	database := &Database{DB: db}
 	now := time.Now()
@@ -90,7 +90,7 @@ func TestGetDomainsToResolve(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	database := &Database{DB: db}
 	now := time.Now()
@@ -129,7 +129,7 @@ func TestGetDomainsToResolve_Empty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	database := &Database{DB: db}
 
@@ -158,7 +158,7 @@ func TestInsertOrUpdateIP_New(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	database := &Database{DB: db}
 
@@ -181,7 +181,7 @@ func TestUpdateDomainResolvStats(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	database := &Database{DB: db}
 
@@ -204,7 +204,7 @@ func TestInsertDomainStat(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	database := &Database{DB: db}
 
@@ -227,7 +227,7 @@ func TestDeleteOldStats(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	database := &Database{DB: db}
 
@@ -254,7 +254,7 @@ func TestDeleteOldStats_NoneDeleted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	database := &Database{DB: db}
 
