@@ -35,7 +35,9 @@ func (db *Database) RunMigrations() error {
 	if err != nil {
 		return fmt.Errorf("failed to create migrator: %w", err)
 	}
-	defer m.Close()
+	defer func() {
+		_, _ = m.Close()
+	}()
 
 	// Run migrations
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
