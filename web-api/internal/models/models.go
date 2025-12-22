@@ -62,3 +62,10 @@ type PaginatedResponse struct {
 	Offset     int         `json:"offset"`
 	TotalPages int         `json:"total_pages"`
 }
+
+// ExportList represents data for plain text export
+type ExportList struct {
+	Domains []string
+	IPv4    []string
+	IPv6    []string
+}

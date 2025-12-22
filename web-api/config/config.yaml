@@ -18,3 +18,17 @@ cors:
     - "http://localhost:8080"
     - "http://localhost:5173"
   allow_credentials: true
+
+export_lists:
+  - name: "Example Domain List"
+    endpoint: "/export/example"
+    domain_regex: "^example\\.com$"
+    include_domains: true
+  - name: "Google Services"
+    endpoint: "/export/google"
+    domain_regex: ".*\\.google\\.com$"
+    include_domains: true
+  - name: "All Domains IPs Only"
+    endpoint: "/export/all-ips"
+    domain_regex: ".*"
+    include_domains: false

@@ -326,3 +326,95 @@ func (db *Database) GetDomainWithIPs(domainID int64) (*models.Domain, error) {
 
 	return &d, nil
 }
+
+// GetExportList retrieves domains and their IPs filtered by domain regex
+func (db *Database) GetExportList(domainRegex string) (*models.ExportList, error) {
+	// Validate regex pattern
+	if domainRegex == "" {
+		return nil, fmt.Errorf("domain regex is required")
+	}
+	if len(domainRegex) > 200 {
+		return nil, fmt.Errorf("regex pattern too long (max 200 characters)")
+	}
+
+	// Check for potentially dangerous patterns
+	dangerousPatterns := []string{
+		"(.*)*",
+		"(.+)+",
+		"(.*)+",
+		"(.+)*",
+	}
+	for _, dangerous := range dangerousPatterns {
+		if strings.Contains(domainRegex, dangerous) {
+			return nil, fmt.Errorf("regex pattern contains potentially dangerous construct: %s", dangerous)
+		}
+	}
+
+	// Query to get unique domains matching the regex
+	domainsQuery := `
+		SELECT DISTINCT domain
+		FROM domain
+		WHERE domain ~ $1
+		ORDER BY domain
+	`
+
+	rows, err := db.DB.Query(domainsQuery, domainRegex)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query domains: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var domains []string
+	for rows.Next() {
+		var domain string
+		if err := rows.Scan(&domain); err != nil {
+			return nil, fmt.Errorf("failed to scan domain: %w", err)
+		}
+		domains = append(domains, domain)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Query to get unique IPs for matching domains
+	ipsQuery := `
+		SELECT DISTINCT ip.ip, ip.type
+		FROM ip
+		INNER JOIN domain ON ip.domain_id = domain.id
+		WHERE domain.domain ~ $1
+		ORDER BY ip.type, ip.ip
+	`
+
+	rows, err = db.DB.Query(ipsQuery, domainRegex)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query IPs: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var ipv4List []string
+	var ipv6List []string
+
+	for rows.Next() {
+		var ip, ipType string
+		if err := rows.Scan(&ip, &ipType); err != nil {
+			return nil, fmt.Errorf("failed to scan IP: %w", err)
+		}
+
+		if ipType == "ipv4" {
+			ipv4List = append(ipv4List, ip)
+		} else if ipType == "ipv6" {
+			ipv6List = append(ipv6List, ip)
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return &models.ExportList{
+		Domains: domains,
+		IPv4:    ipv4List,
+		IPv6:    ipv6List,
+	}, nil
+}

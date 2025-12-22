@@ -177,3 +177,49 @@ func (h *Handler) HealthCheck(c *gin.Context) {
 		"time":   time.Now(),
 	})
 }
+
+// ExportList handles export list endpoints
+func (h *Handler) ExportList(c *gin.Context, domainRegex string, includeDomains bool) {
+	// Get data from database
+	exportList, err := h.db.GetExportList(domainRegex)
+	if err != nil {
+		log.Printf("Error getting export list: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Log if export list is empty (useful for debugging)
+	if len(exportList.Domains) == 0 && len(exportList.IPv4) == 0 && len(exportList.IPv6) == 0 {
+		log.Printf("Export list returned empty results for regex: %s", domainRegex)
+	}
+
+	// Build plain text response
+	var result strings.Builder
+
+	// Add domains if enabled
+	if includeDomains {
+		for _, domain := range exportList.Domains {
+			// Remove trailing dot from FQDN if present
+			domain = strings.TrimSuffix(domain, ".")
+			result.WriteString(domain)
+			result.WriteString("\n")
+		}
+	}
+
+	// Add IPv4 addresses
+	for _, ip := range exportList.IPv4 {
+		result.WriteString(ip)
+		result.WriteString("\n")
+	}
+
+	// Add IPv6 addresses
+	for _, ip := range exportList.IPv6 {
+		result.WriteString(ip)
+		result.WriteString("\n")
+	}
+
+	// Return as plain text with caching headers
+	c.Header("Content-Type", "text/plain; charset=utf-8")
+	c.Header("Cache-Control", "public, max-age=300") // 5 minutes cache
+	c.String(http.StatusOK, result.String())
+}
