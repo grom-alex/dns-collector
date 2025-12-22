@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"dns-collector/internal/cleanup"
 	"dns-collector/internal/config"
 	"dns-collector/internal/database"
 	"dns-collector/internal/resolver"
@@ -38,9 +39,16 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	log.Println("Database connected successfully")
+
+	// Run database migrations
+	log.Println("Running database migrations...")
+	if err := db.RunMigrations(); err != nil {
+		log.Fatalf("Failed to run migrations: %v", err)
+	}
+	log.Println("Migrations completed successfully")
 
 	// Create and start UDP server
 	udpServer := server.NewUDPServer(cfg, db)
@@ -53,6 +61,11 @@ func main() {
 	dnsResolver := resolver.NewResolver(cfg, db)
 	dnsResolver.Start()
 	defer dnsResolver.Stop()
+
+	// Create and start cleanup service
+	cleanupService := cleanup.NewService(cfg, db)
+	cleanupService.Start()
+	defer cleanupService.Stop()
 
 	log.Println("DNS Collector is running. Press Ctrl+C to stop.")
 

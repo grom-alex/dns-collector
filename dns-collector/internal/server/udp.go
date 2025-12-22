@@ -106,7 +106,7 @@ func (s *UDPServer) handleMessage(data []byte) {
 func (s *UDPServer) Stop() {
 	close(s.stopCh)
 	if s.conn != nil {
-		s.conn.Close()
+		_ = s.conn.Close()
 	}
 	log.Println("UDP server stopped")
 }

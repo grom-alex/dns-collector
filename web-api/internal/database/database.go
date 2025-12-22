@@ -13,10 +13,29 @@ import (
 )
 
 type Database struct {
-	DB *sql.DB
+	DB     *sql.DB
+	config *dbConfig
+}
+
+type dbConfig struct {
+	Host     string
+	Port     int
+	User     string
+	Password string
+	Database string
+	SSLMode  string
 }
 
 func New(host string, port int, user, password, dbname, sslmode string) (*Database, error) {
+	config := &dbConfig{
+		Host:     host,
+		Port:     port,
+		User:     user,
+		Password: password,
+		Database: dbname,
+		SSLMode:  sslmode,
+	}
+
 	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		host, port, user, password, dbname, sslmode)
 
@@ -27,7 +46,7 @@ func New(host string, port int, user, password, dbname, sslmode string) (*Databa
 
 	// Test connection
 	if err := db.Ping(); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
@@ -36,7 +55,10 @@ func New(host string, port int, user, password, dbname, sslmode string) (*Databa
 	db.SetMaxIdleConns(5)
 	db.SetConnMaxLifetime(5 * time.Minute)
 
-	return &Database{DB: db}, nil
+	return &Database{
+		DB:     db,
+		config: config,
+	}, nil
 }
 
 func (db *Database) Close() error {
@@ -141,7 +163,7 @@ func (db *Database) GetStats(filter models.StatsFilter) ([]models.DomainStat, in
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to query stats: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var stats []models.DomainStat
 	for rows.Next() {
@@ -244,7 +266,7 @@ func (db *Database) GetDomains(filter models.DomainsFilter) ([]models.Domain, in
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to query domains: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var domains []models.Domain
 	for rows.Next() {
@@ -266,7 +288,7 @@ func (db *Database) GetDomainIPs(domainID int64) ([]models.IP, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to query IPs: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var ips []models.IP
 	for rows.Next() {

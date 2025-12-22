@@ -17,3 +17,6 @@ resolver:
 
 logging:
   level: "info"  # debug, info, warn, error
+
+retention:
+  stats_days: 30  # Keep statistics for 30 days (1 month)

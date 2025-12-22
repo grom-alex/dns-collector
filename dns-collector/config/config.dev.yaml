@@ -17,3 +17,6 @@ resolver:
 
 logging:
   level: "debug"       # Debug mode for development
+
+retention:
+  stats_days: 7        # Keep statistics for 7 days in development

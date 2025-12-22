@@ -8,7 +8,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # Build stage for backend
-FROM golang:1.21-bullseye AS backend-builder
+FROM golang:1.24-bullseye AS backend-builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \

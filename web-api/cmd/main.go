@@ -102,9 +102,16 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	log.Println("Database connected successfully")
+
+	// Run database migrations
+	log.Println("Running database migrations...")
+	if err := db.RunMigrations(); err != nil {
+		log.Fatalf("Failed to run migrations: %v", err)
+	}
+	log.Println("Migrations completed successfully")
 
 	// Initialize handlers
 	h := handlers.NewHandler(db)

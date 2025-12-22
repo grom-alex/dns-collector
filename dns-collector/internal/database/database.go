@@ -9,7 +9,17 @@ import (
 )
 
 type Database struct {
-	DB *sql.DB
+	DB     *sql.DB
+	config *dbConfig
+}
+
+type dbConfig struct {
+	Host     string
+	Port     int
+	User     string
+	Password string
+	Database string
+	SSLMode  string
 }
 
 type Domain struct {
@@ -38,6 +48,15 @@ type DomainStat struct {
 }
 
 func New(host string, port int, user, password, dbname, sslmode string) (*Database, error) {
+	config := &dbConfig{
+		Host:     host,
+		Port:     port,
+		User:     user,
+		Password: password,
+		Database: dbname,
+		SSLMode:  sslmode,
+	}
+
 	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		host, port, user, password, dbname, sslmode)
 
@@ -48,7 +67,7 @@ func New(host string, port int, user, password, dbname, sslmode string) (*Databa
 
 	// Test connection
 	if err := db.Ping(); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
@@ -57,10 +76,13 @@ func New(host string, port int, user, password, dbname, sslmode string) (*Databa
 	db.SetMaxIdleConns(5)
 	db.SetConnMaxLifetime(5 * time.Minute)
 
-	database := &Database{DB: db}
+	database := &Database{
+		DB:     db,
+		config: config,
+	}
 
 	if err := database.initSchema(); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("failed to initialize schema: %w", err)
 	}
 
@@ -175,7 +197,7 @@ func (db *Database) GetDomainsToResolve(limit int) ([]Domain, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to query domains: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var domains []Domain
 	for rows.Next() {
@@ -240,4 +262,24 @@ func (db *Database) InsertDomainStat(domain, clientIP, rtype string) error {
 	}
 
 	return nil
+}
+
+// DeleteOldStats deletes statistics records older than the specified number of days
+func (db *Database) DeleteOldStats(retentionDays int) (int64, error) {
+	cutoffTime := time.Now().AddDate(0, 0, -retentionDays)
+
+	result, err := db.DB.Exec(
+		`DELETE FROM domain_stat WHERE timestamp < $1`,
+		cutoffTime,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("failed to delete old stats: %w", err)
+	}
+
+	deleted, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	return deleted, nil
 }

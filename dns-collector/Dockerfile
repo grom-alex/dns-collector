@@ -1,7 +1,7 @@
 # Multi-stage build для минимального размера образа
 
 # Stage 1: Build
-FROM golang:1.21-bullseye AS builder
+FROM golang:1.24-bullseye AS builder
 
 # Установка необходимых пакетов для сборки
 RUN apt-get update && apt-get install -y --no-install-recommends \
