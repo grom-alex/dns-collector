@@ -367,6 +367,114 @@ retention:
 	}
 }
 
+func TestLoad_RetentionValidation(t *testing.T) {
+	tests := []struct {
+		name        string
+		statsDays   string
+		expectError bool
+	}{
+		{"valid 30 days", "30", false},
+		{"valid 365 days", "365", false},
+		{"invalid exceeds max", "400", true},
+		{"valid 1 day", "1", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			configPath := filepath.Join(tmpDir, "config.yaml")
+
+			configContent := `server:
+  udp_port: 5353
+database:
+  host: "localhost"
+  port: 5432
+  user: "test"
+  password: "test"
+  database: "test"
+  ssl_mode: "disable"
+resolver:
+  interval_seconds: 10
+  max_resolv: 5
+  timeout_seconds: 5
+logging:
+  level: "info"
+retention:
+  stats_days: ` + tt.statsDays + `
+`
+
+			if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+				t.Fatalf("Failed to create test config: %v", err)
+			}
+
+			_, err := Load(configPath)
+			if tt.expectError && err == nil {
+				t.Error("Expected error but got nil")
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("Expected no error but got: %v", err)
+			}
+		})
+	}
+}
+
+func TestLoad_CleanupIntervalValidation(t *testing.T) {
+	tests := []struct {
+		name          string
+		intervalHours string
+		expectError   bool
+		expectedValue int
+	}{
+		{"valid 24 hours", "24", false, 24},
+		{"valid 12 hours", "12", false, 12},
+		{"invalid exceeds max", "200", true, 0},
+		{"default on zero", "0", false, 24},
+		{"default on negative", "-5", false, 24},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			configPath := filepath.Join(tmpDir, "config.yaml")
+
+			configContent := `server:
+  udp_port: 5353
+database:
+  host: "localhost"
+  port: 5432
+  user: "test"
+  password: "test"
+  database: "test"
+  ssl_mode: "disable"
+resolver:
+  interval_seconds: 10
+  max_resolv: 5
+  timeout_seconds: 5
+logging:
+  level: "info"
+retention:
+  stats_days: 30
+  cleanup_interval_hours: ` + tt.intervalHours + `
+`
+
+			if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+				t.Fatalf("Failed to create test config: %v", err)
+			}
+
+			cfg, err := Load(configPath)
+			if tt.expectError && err == nil {
+				t.Error("Expected error but got nil")
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("Expected no error but got: %v", err)
+			}
+			if !tt.expectError && cfg.Retention.CleanupIntervalHours != tt.expectedValue {
+				t.Errorf("Expected CleanupIntervalHours=%d, got %d", tt.expectedValue, cfg.Retention.CleanupIntervalHours)
+			}
+		})
+	}
+}
+
 func TestLoad_FileNotFound(t *testing.T) {
 	_, err := Load("/nonexistent/path/config.yaml")
 	if err == nil {

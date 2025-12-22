@@ -45,7 +45,8 @@ type WebAPIConfig struct {
 }
 
 type RetentionConfig struct {
-	StatsDays int `yaml:"stats_days"`
+	StatsDays            int `yaml:"stats_days"`
+	CleanupIntervalHours int `yaml:"cleanup_interval_hours"`
 }
 
 func Load(path string) (*Config, error) {
@@ -83,8 +84,21 @@ func Load(path string) (*Config, error) {
 	if cfg.WebAPI.Port <= 0 || cfg.WebAPI.Port > 65535 {
 		cfg.WebAPI.Port = 8080 // default port
 	}
+
+	// Validate retention period: must be between 1 and 365 days
 	if cfg.Retention.StatsDays <= 0 {
 		cfg.Retention.StatsDays = 30 // default 30 days (1 month)
+	}
+	if cfg.Retention.StatsDays > 365 {
+		return nil, fmt.Errorf("retention stats_days must not exceed 365 days, got %d", cfg.Retention.StatsDays)
+	}
+
+	// Validate cleanup interval: must be between 1 and 168 hours (1 week)
+	if cfg.Retention.CleanupIntervalHours <= 0 {
+		cfg.Retention.CleanupIntervalHours = 24 // default 24 hours (once per day)
+	}
+	if cfg.Retention.CleanupIntervalHours > 168 {
+		return nil, fmt.Errorf("retention cleanup_interval_hours must not exceed 168 hours (1 week), got %d", cfg.Retention.CleanupIntervalHours)
 	}
 
 	return &cfg, nil

@@ -20,3 +20,4 @@ logging:
 
 retention:
   stats_days: 7        # Keep statistics for 7 days in development
+  cleanup_interval_hours: 12  # More frequent cleanup in development (every 12 hours)

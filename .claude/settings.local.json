@@ -8,7 +8,12 @@
       "Bash(docker-compose build:*)",
       "Bash(git add:*)",
       "Bash(docker-compose logs:*)",
-      "Bash(nc:*)"
+      "Bash(nc:*)",
+      "Bash(make lint:*)",
+      "Bash(docker build:*)",
+      "Bash(docker run:*)",
+      "Bash(docker inspect:*)",
+      "Bash(make test-unit:*)"
     ]
   }
 }
