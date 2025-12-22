@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"dns-collector/internal/cleanup"
 	"dns-collector/internal/config"
 	"dns-collector/internal/database"
 	"dns-collector/internal/resolver"
@@ -60,6 +61,11 @@ func main() {
 	dnsResolver := resolver.NewResolver(cfg, db)
 	dnsResolver.Start()
 	defer dnsResolver.Stop()
+
+	// Create and start cleanup service
+	cleanupService := cleanup.NewService(cfg, db)
+	cleanupService.Start()
+	defer cleanupService.Stop()
 
 	log.Println("DNS Collector is running. Press Ctrl+C to stop.")
 

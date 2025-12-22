@@ -263,3 +263,23 @@ func (db *Database) InsertDomainStat(domain, clientIP, rtype string) error {
 
 	return nil
 }
+
+// DeleteOldStats deletes statistics records older than the specified number of days
+func (db *Database) DeleteOldStats(retentionDays int) (int64, error) {
+	cutoffTime := time.Now().AddDate(0, 0, -retentionDays)
+
+	result, err := db.DB.Exec(
+		`DELETE FROM domain_stat WHERE timestamp < $1`,
+		cutoffTime,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("failed to delete old stats: %w", err)
+	}
+
+	deleted, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	return deleted, nil
+}

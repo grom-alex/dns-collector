@@ -17,3 +17,6 @@ resolver:
 
 logging:
   level: "info"  # info level for production
+
+retention:
+  stats_days: 30  # Keep statistics for 30 days (1 month)

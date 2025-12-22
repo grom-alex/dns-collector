@@ -291,6 +291,82 @@ webapi:
 	}
 }
 
+func TestLoad_DefaultRetentionDays(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	configContent := `server:
+  udp_port: 5353
+database:
+  host: "localhost"
+  port: 5432
+  user: "test"
+  password: "test"
+  database: "test"
+  ssl_mode: "disable"
+resolver:
+  interval_seconds: 10
+  max_resolv: 5
+  timeout_seconds: 5
+logging:
+  level: "info"
+`
+
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("Failed to create test config: %v", err)
+	}
+
+	cfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	// Check default retention period is 30 days
+	if cfg.Retention.StatsDays != 30 {
+		t.Errorf("Expected default Retention.StatsDays=30, got %d", cfg.Retention.StatsDays)
+	}
+}
+
+func TestLoad_RetentionConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	configContent := `server:
+  udp_port: 5353
+database:
+  host: "localhost"
+  port: 5432
+  user: "test"
+  password: "test"
+  database: "test"
+  ssl_mode: "disable"
+resolver:
+  interval_seconds: 10
+  max_resolv: 5
+  timeout_seconds: 5
+  workers: 2
+logging:
+  level: "info"
+webapi:
+  port: 8080
+retention:
+  stats_days: 90
+`
+
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("Failed to create test config: %v", err)
+	}
+
+	cfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	if cfg.Retention.StatsDays != 90 {
+		t.Errorf("Expected Retention.StatsDays=90, got %d", cfg.Retention.StatsDays)
+	}
+}
+
 func TestLoad_FileNotFound(t *testing.T) {
 	_, err := Load("/nonexistent/path/config.yaml")
 	if err == nil {

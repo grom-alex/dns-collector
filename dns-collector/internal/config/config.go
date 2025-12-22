@@ -8,11 +8,12 @@ import (
 )
 
 type Config struct {
-	Server   ServerConfig   `yaml:"server"`
-	Database DatabaseConfig `yaml:"database"`
-	Resolver ResolverConfig `yaml:"resolver"`
-	Logging  LoggingConfig  `yaml:"logging"`
-	WebAPI   WebAPIConfig   `yaml:"webapi"`
+	Server    ServerConfig    `yaml:"server"`
+	Database  DatabaseConfig  `yaml:"database"`
+	Resolver  ResolverConfig  `yaml:"resolver"`
+	Logging   LoggingConfig   `yaml:"logging"`
+	WebAPI    WebAPIConfig    `yaml:"webapi"`
+	Retention RetentionConfig `yaml:"retention"`
 }
 
 type ServerConfig struct {
@@ -41,6 +42,10 @@ type LoggingConfig struct {
 
 type WebAPIConfig struct {
 	Port int `yaml:"port"`
+}
+
+type RetentionConfig struct {
+	StatsDays int `yaml:"stats_days"`
 }
 
 func Load(path string) (*Config, error) {
@@ -77,6 +82,9 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.WebAPI.Port <= 0 || cfg.WebAPI.Port > 65535 {
 		cfg.WebAPI.Port = 8080 // default port
+	}
+	if cfg.Retention.StatsDays <= 0 {
+		cfg.Retention.StatsDays = 30 // default 30 days (1 month)
 	}
 
 	return &cfg, nil
