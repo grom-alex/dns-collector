@@ -20,7 +20,7 @@ func NewService(cfg *config.Config, db *database.Database) *Service {
 	return &Service{
 		db:              db,
 		retentionDays:   cfg.Retention.StatsDays,
-		cleanupInterval: 24 * time.Hour, // Run cleanup once per day
+		cleanupInterval: time.Duration(cfg.Retention.CleanupIntervalHours) * time.Hour,
 		stopChan:        make(chan struct{}),
 		doneChan:        make(chan struct{}),
 	}

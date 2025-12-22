@@ -10,16 +10,12 @@ import (
 func TestNewService(t *testing.T) {
 	cfg := &config.Config{
 		Retention: config.RetentionConfig{
-			StatsDays: 30,
+			StatsDays:            30,
+			CleanupIntervalHours: 24,
 		},
 	}
 
-	service := &Service{
-		retentionDays:   cfg.Retention.StatsDays,
-		cleanupInterval: 24 * time.Hour,
-		stopChan:        make(chan struct{}),
-		doneChan:        make(chan struct{}),
-	}
+	service := NewService(cfg, nil)
 
 	if service.retentionDays != 30 {
 		t.Errorf("Expected retentionDays=30, got %d", service.retentionDays)
@@ -45,16 +41,12 @@ func TestServiceRetentionPeriod(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &config.Config{
 				Retention: config.RetentionConfig{
-					StatsDays: tt.retentionDays,
+					StatsDays:            tt.retentionDays,
+					CleanupIntervalHours: 24,
 				},
 			}
 
-			service := &Service{
-				retentionDays:   cfg.Retention.StatsDays,
-				cleanupInterval: 24 * time.Hour,
-				stopChan:        make(chan struct{}),
-				doneChan:        make(chan struct{}),
-			}
+			service := NewService(cfg, nil)
 
 			if service.retentionDays != tt.retentionDays {
 				t.Errorf("Expected retentionDays=%d, got %d", tt.retentionDays, service.retentionDays)
@@ -66,16 +58,12 @@ func TestServiceRetentionPeriod(t *testing.T) {
 func TestServiceChannels(t *testing.T) {
 	cfg := &config.Config{
 		Retention: config.RetentionConfig{
-			StatsDays: 30,
+			StatsDays:            30,
+			CleanupIntervalHours: 24,
 		},
 	}
 
-	service := &Service{
-		retentionDays:   cfg.Retention.StatsDays,
-		cleanupInterval: 24 * time.Hour,
-		stopChan:        make(chan struct{}),
-		doneChan:        make(chan struct{}),
-	}
+	service := NewService(cfg, nil)
 
 	// Test that channels are created
 	if service.stopChan == nil {
@@ -100,12 +88,30 @@ func TestServiceChannels(t *testing.T) {
 }
 
 func TestCleanupInterval(t *testing.T) {
-	service := &Service{
-		cleanupInterval: 24 * time.Hour,
+	tests := []struct {
+		name          string
+		intervalHours int
+		expected      time.Duration
+	}{
+		{"24 hours", 24, 24 * time.Hour},
+		{"12 hours", 12, 12 * time.Hour},
+		{"48 hours", 48, 48 * time.Hour},
 	}
 
-	expectedInterval := 24 * time.Hour
-	if service.cleanupInterval != expectedInterval {
-		t.Errorf("Expected cleanup interval=%v, got %v", expectedInterval, service.cleanupInterval)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &config.Config{
+				Retention: config.RetentionConfig{
+					StatsDays:            30,
+					CleanupIntervalHours: tt.intervalHours,
+				},
+			}
+
+			service := NewService(cfg, nil)
+
+			if service.cleanupInterval != tt.expected {
+				t.Errorf("Expected cleanup interval=%v, got %v", tt.expected, service.cleanupInterval)
+			}
+		})
 	}
 }

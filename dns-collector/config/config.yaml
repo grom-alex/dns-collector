@@ -20,3 +20,4 @@ logging:
 
 retention:
   stats_days: 30  # Keep statistics for 30 days (1 month)
+  cleanup_interval_hours: 24  # Run cleanup every 24 hours (once per day)
