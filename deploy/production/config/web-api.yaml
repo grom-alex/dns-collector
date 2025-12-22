@@ -18,3 +18,24 @@ cors:
     - "https://your-domain.com"  # Replace with actual domain
     - "https://www.your-domain.com"
   allow_credentials: true
+
+# Export lists for pfSense firewall alias tables
+# Configure domain filters and endpoints for IP/domain exports
+export_lists:
+  # Example: Export specific domain and its IPs
+  # - name: "Blocked Domains"
+  #   endpoint: "/export/blocked"
+  #   domain_regex: "^(malware|phishing)\\..*$"
+  #   include_domains: true
+
+  # Example: Export all IPs without domains
+  # - name: "All IPs"
+  #   endpoint: "/export/all-ips"
+  #   domain_regex: ".*"
+  #   include_domains: false
+
+  # Example: Export specific TLD
+  # - name: "RU Domains"
+  #   endpoint: "/export/ru-domains"
+  #   domain_regex: ".*\\.ru$"
+  #   include_domains: true
