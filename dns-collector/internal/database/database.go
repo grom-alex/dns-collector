@@ -67,7 +67,7 @@ func New(host string, port int, user, password, dbname, sslmode string) (*Databa
 
 	// Test connection
 	if err := db.Ping(); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
@@ -82,7 +82,7 @@ func New(host string, port int, user, password, dbname, sslmode string) (*Databa
 	}
 
 	if err := database.initSchema(); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("failed to initialize schema: %w", err)
 	}
 

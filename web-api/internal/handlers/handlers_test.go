@@ -157,7 +157,7 @@ func TestGetStats_WithPagination(t *testing.T) {
 	}
 
 	var response models.PaginatedResponse
-	json.Unmarshal(w.Body.Bytes(), &response)
+	_ = json.Unmarshal(w.Body.Bytes(), &response)
 
 	// Total pages should be ceil(50 / 20) = 3
 	if response.TotalPages != 3 {
@@ -184,7 +184,7 @@ func TestGetStats_DatabaseError(t *testing.T) {
 	}
 
 	var response map[string]interface{}
-	json.Unmarshal(w.Body.Bytes(), &response)
+	_ = json.Unmarshal(w.Body.Bytes(), &response)
 
 	if _, ok := response["error"]; !ok {
 		t.Error("Expected error field in response")
@@ -225,7 +225,7 @@ func TestGetDomainByID_Success(t *testing.T) {
 	}
 
 	var response models.Domain
-	json.Unmarshal(w.Body.Bytes(), &response)
+	_ = json.Unmarshal(w.Body.Bytes(), &response)
 
 	if response.Domain != "example.com" {
 		t.Errorf("Expected domain=example.com, got %s", response.Domain)
@@ -250,7 +250,7 @@ func TestGetDomainByID_InvalidID(t *testing.T) {
 	}
 
 	var response map[string]interface{}
-	json.Unmarshal(w.Body.Bytes(), &response)
+	_ = json.Unmarshal(w.Body.Bytes(), &response)
 
 	if response["error"] != "invalid domain ID" {
 		t.Errorf("Expected 'invalid domain ID' error, got %v", response["error"])
@@ -386,7 +386,7 @@ func TestGetDomains_Success(t *testing.T) {
 	}
 
 	var response models.PaginatedResponse
-	json.Unmarshal(w.Body.Bytes(), &response)
+	_ = json.Unmarshal(w.Body.Bytes(), &response)
 
 	if response.Total != 1 {
 		t.Errorf("Expected total=1, got %d", response.Total)

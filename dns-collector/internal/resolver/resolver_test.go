@@ -294,12 +294,7 @@ func TestTickerInterval(t *testing.T) {
 	ticker := time.NewTicker(time.Duration(intervalSeconds) * time.Second)
 	defer ticker.Stop()
 
-	// Verify ticker is created
-	if ticker == nil {
-		t.Error("Expected ticker to be created")
-	}
-
-	// Ticker should have a channel
+	// Ticker should have a channel that doesn't fire immediately
 	select {
 	case <-ticker.C:
 		t.Error("Ticker should not fire immediately")
