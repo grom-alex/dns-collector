@@ -15,9 +15,10 @@ import (
 
 // MockDatabase implements database.DB interface for testing
 type MockDatabase struct {
-	GetStatsFunc       func(filter models.StatsFilter) ([]models.DomainStat, int64, error)
-	GetDomainsFunc     func(filter models.DomainsFilter) ([]models.Domain, int64, error)
+	GetStatsFunc         func(filter models.StatsFilter) ([]models.DomainStat, int64, error)
+	GetDomainsFunc       func(filter models.DomainsFilter) ([]models.Domain, int64, error)
 	GetDomainWithIPsFunc func(id int64) (*models.Domain, error)
+	GetExportListFunc    func(domainRegex string) (*models.ExportList, error)
 }
 
 func (m *MockDatabase) GetStats(filter models.StatsFilter) ([]models.DomainStat, int64, error) {
@@ -39,6 +40,13 @@ func (m *MockDatabase) GetDomainWithIPs(id int64) (*models.Domain, error) {
 		return m.GetDomainWithIPsFunc(id)
 	}
 	return nil, nil
+}
+
+func (m *MockDatabase) GetExportList(domainRegex string) (*models.ExportList, error) {
+	if m.GetExportListFunc != nil {
+		return m.GetExportListFunc(domainRegex)
+	}
+	return &models.ExportList{}, nil
 }
 
 func (m *MockDatabase) Close() error {

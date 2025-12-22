@@ -39,6 +39,14 @@ type Config struct {
 		AllowedOrigins   []string `yaml:"allowed_origins"`
 		AllowCredentials bool     `yaml:"allow_credentials"`
 	} `yaml:"cors"`
+	ExportLists []ExportListConfig `yaml:"export_lists"`
+}
+
+type ExportListConfig struct {
+	Name           string `yaml:"name"`
+	Endpoint       string `yaml:"endpoint"`
+	DomainRegex    string `yaml:"domain_regex"`
+	IncludeDomains bool   `yaml:"include_domains"`
 }
 
 func loadConfig(path string) (*Config, error) {
@@ -60,7 +68,49 @@ func loadConfig(path string) (*Config, error) {
 		cfg.Server.Host = "0.0.0.0"
 	}
 
+	// Validate export lists configuration
+	if err := validateExportLists(cfg.ExportLists); err != nil {
+		return nil, fmt.Errorf("invalid export lists configuration: %w", err)
+	}
+
 	return &cfg, nil
+}
+
+func validateExportLists(lists []ExportListConfig) error {
+	endpoints := make(map[string]bool)
+	names := make(map[string]bool)
+
+	for i, list := range lists {
+		// Check required fields
+		if list.Name == "" {
+			return fmt.Errorf("export list at index %d: name is required", i)
+		}
+		if list.Endpoint == "" {
+			return fmt.Errorf("export list '%s': endpoint is required", list.Name)
+		}
+		if list.DomainRegex == "" {
+			return fmt.Errorf("export list '%s': domain_regex is required", list.Name)
+		}
+
+		// Check for duplicate names
+		if names[list.Name] {
+			return fmt.Errorf("export list '%s': duplicate name", list.Name)
+		}
+		names[list.Name] = true
+
+		// Check for duplicate endpoints
+		if endpoints[list.Endpoint] {
+			return fmt.Errorf("export list '%s': duplicate endpoint '%s'", list.Name, list.Endpoint)
+		}
+		endpoints[list.Endpoint] = true
+
+		// Validate endpoint starts with /
+		if list.Endpoint[0] != '/' {
+			return fmt.Errorf("export list '%s': endpoint must start with /", list.Name)
+		}
+	}
+
+	return nil
 }
 
 func main() {
@@ -142,6 +192,15 @@ func main() {
 		api.GET("/stats", h.GetStats)
 		api.GET("/domains", h.GetDomains)
 		api.GET("/domains/:id", h.GetDomainByID)
+	}
+
+	// Register export list endpoints
+	for _, exportList := range cfg.ExportLists {
+		listConfig := exportList
+		router.GET(listConfig.Endpoint, func(c *gin.Context) {
+			h.ExportList(c, listConfig.DomainRegex, listConfig.IncludeDomains)
+		})
+		log.Printf("Registered export list '%s' at %s", listConfig.Name, listConfig.Endpoint)
 	}
 
 	// Serve static files for frontend

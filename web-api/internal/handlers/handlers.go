@@ -177,3 +177,41 @@ func (h *Handler) HealthCheck(c *gin.Context) {
 		"time":   time.Now(),
 	})
 }
+
+// ExportList handles export list endpoints
+func (h *Handler) ExportList(c *gin.Context, domainRegex string, includeDomains bool) {
+	// Get data from database
+	exportList, err := h.db.GetExportList(domainRegex)
+	if err != nil {
+		log.Printf("Error getting export list: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Build plain text response
+	var result strings.Builder
+
+	// Add domains if enabled
+	if includeDomains {
+		for _, domain := range exportList.Domains {
+			result.WriteString(domain)
+			result.WriteString("\n")
+		}
+	}
+
+	// Add IPv4 addresses
+	for _, ip := range exportList.IPv4 {
+		result.WriteString(ip)
+		result.WriteString("\n")
+	}
+
+	// Add IPv6 addresses
+	for _, ip := range exportList.IPv6 {
+		result.WriteString(ip)
+		result.WriteString("\n")
+	}
+
+	// Return as plain text
+	c.Header("Content-Type", "text/plain; charset=utf-8")
+	c.String(http.StatusOK, result.String())
+}
