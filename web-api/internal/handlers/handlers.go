@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"log"
 	"math"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"dns-collector-webapi/internal/database"
+	"dns-collector-webapi/internal/excel"
 	"dns-collector-webapi/internal/models"
 )
 
@@ -222,4 +224,155 @@ func (h *Handler) ExportList(c *gin.Context, domainRegex string, includeDomains 
 	c.Header("Content-Type", "text/plain; charset=utf-8")
 	c.Header("Cache-Control", "public, max-age=300") // 5 minutes cache
 	c.String(http.StatusOK, result.String())
+}
+
+// ExportStats handles GET /api/stats/export - exports stats to Excel
+func (h *Handler) ExportStats(c *gin.Context) {
+	var filter models.StatsFilter
+
+	// Parse client IPs
+	if clientIPs := c.Query("client_ips"); clientIPs != "" {
+		filter.ClientIPs = strings.Split(clientIPs, ",")
+		// Trim spaces
+		for i := range filter.ClientIPs {
+			filter.ClientIPs[i] = strings.TrimSpace(filter.ClientIPs[i])
+		}
+	}
+
+	// Parse subnet
+	filter.Subnet = c.Query("subnet")
+
+	// Parse date range
+	if dateFrom := c.Query("date_from"); dateFrom != "" {
+		if t, err := time.Parse(time.RFC3339, dateFrom); err == nil {
+			filter.DateFrom = t
+		}
+	}
+	if dateTo := c.Query("date_to"); dateTo != "" {
+		if t, err := time.Parse(time.RFC3339, dateTo); err == nil {
+			filter.DateTo = t
+		}
+	}
+
+	// Parse sorting
+	filter.SortBy = c.DefaultQuery("sort_by", "timestamp")
+	filter.SortOrder = c.DefaultQuery("sort_order", "desc")
+
+	// Set high limit for export (100K max)
+	filter.Limit = 100000
+	filter.Offset = 0
+
+	// Query database
+	stats, total, err := h.db.GetStats(filter)
+	if err != nil {
+		log.Printf("Error getting stats for export: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Check if total exceeds limit
+	if total > 100000 {
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{
+			"error": "Dataset too large to export",
+			"total": total,
+			"limit": 100000,
+		})
+		return
+	}
+
+	// Generate Excel file
+	exporter := excel.NewExporter()
+	file, err := exporter.ExportStats(stats)
+	if err != nil {
+		log.Printf("Excel generation failed: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate Excel file"})
+		return
+	}
+	defer func() {
+		if err := file.Close(); err != nil {
+			log.Printf("Error closing Excel file: %v", err)
+		}
+	}()
+
+	// Set headers
+	filename := fmt.Sprintf("dns-stats-%s.xlsx", time.Now().Format("2006-01-02"))
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
+	c.Header("Cache-Control", "no-cache")
+
+	// Write to response
+	if err := file.Write(c.Writer); err != nil {
+		log.Printf("Failed to write Excel to response: %v", err)
+	}
+}
+
+// ExportDomains handles GET /api/domains/export - exports domains to Excel
+func (h *Handler) ExportDomains(c *gin.Context) {
+	var filter models.DomainsFilter
+
+	// Parse domain regex
+	filter.DomainRegex = c.Query("domain_regex")
+
+	// Parse date range
+	if dateFrom := c.Query("date_from"); dateFrom != "" {
+		if t, err := time.Parse(time.RFC3339, dateFrom); err == nil {
+			filter.DateFrom = t
+		}
+	}
+	if dateTo := c.Query("date_to"); dateTo != "" {
+		if t, err := time.Parse(time.RFC3339, dateTo); err == nil {
+			filter.DateTo = t
+		}
+	}
+
+	// Parse sorting
+	filter.SortBy = c.DefaultQuery("sort_by", "time_insert")
+	filter.SortOrder = c.DefaultQuery("sort_order", "desc")
+
+	// Set high limit for export (100K max)
+	filter.Limit = 100000
+	filter.Offset = 0
+
+	// Query database with bulk IP fetch
+	domains, total, err := h.db.GetDomainsWithIPs(filter)
+	if err != nil {
+		log.Printf("Error getting domains for export: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Check if total exceeds limit
+	if total > 100000 {
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{
+			"error": "Dataset too large to export",
+			"total": total,
+			"limit": 100000,
+		})
+		return
+	}
+
+	// Generate Excel file
+	exporter := excel.NewExporter()
+	file, err := exporter.ExportDomains(domains)
+	if err != nil {
+		log.Printf("Excel generation failed: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate Excel file"})
+		return
+	}
+	defer func() {
+		if err := file.Close(); err != nil {
+			log.Printf("Error closing Excel file: %v", err)
+		}
+	}()
+
+	// Set headers
+	filename := fmt.Sprintf("dns-domains-%s.xlsx", time.Now().Format("2006-01-02"))
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
+	c.Header("Cache-Control", "no-cache")
+
+	// Write to response
+	if err := file.Write(c.Writer); err != nil {
+		log.Printf("Failed to write Excel to response: %v", err)
+	}
 }

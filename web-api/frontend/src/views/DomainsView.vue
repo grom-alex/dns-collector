@@ -48,6 +48,13 @@
       <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
         <button @click="applyFilters" class="btn btn-primary">Apply Filters</button>
         <button @click="resetFilters" class="btn btn-secondary">Reset</button>
+        <button
+          @click="exportToExcel"
+          :disabled="exporting || loading || domains.length === 0"
+          class="btn btn-primary"
+        >
+          {{ exporting ? 'Exporting...' : 'Export to Excel' }}
+        </button>
       </div>
     </div>
 
@@ -166,7 +173,7 @@
 
 <script>
 import { ref, reactive, onMounted } from 'vue'
-import { getDomains, getDomainById } from '../api/api'
+import { getDomains, getDomainById, exportDomains } from '../api/api'
 import { format } from 'date-fns'
 
 export default {
@@ -175,6 +182,7 @@ export default {
     const domains = ref([])
     const loading = ref(false)
     const error = ref(null)
+    const exporting = ref(false)
     const currentPage = ref(1)
     const expandedDomain = ref(null)
     const loadingDetails = ref(false)
@@ -320,6 +328,56 @@ export default {
       return format(new Date(dateStr), 'yyyy-MM-dd HH:mm:ss')
     }
 
+    const exportToExcel = async () => {
+      exporting.value = true
+      error.value = null
+
+      try {
+        const params = {
+          sort_by: filters.value.sortBy,
+          sort_order: filters.value.sortOrder
+        }
+
+        if (filters.value.domainRegex) {
+          params.domain_regex = filters.value.domainRegex
+        }
+        if (filters.value.dateFrom) {
+          params.date_from = new Date(filters.value.dateFrom).toISOString()
+        }
+        if (filters.value.dateTo) {
+          params.date_to = new Date(filters.value.dateTo).toISOString()
+        }
+
+        const response = await exportDomains(params)
+
+        // Create blob and download
+        const url = window.URL.createObjectURL(new Blob([response.data]))
+        const link = document.createElement('a')
+        link.href = url
+
+        // Extract filename from header
+        const disposition = response.headers['content-disposition']
+        const filename = disposition?.match(/filename="(.+)"/)?.[1] || 'dns-domains.xlsx'
+
+        link.download = filename
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        window.URL.revokeObjectURL(url)
+      } catch (err) {
+        console.error('Failed to export domains:', err)
+        if (err.response?.status === 413) {
+          error.value = 'Данные слишком большие для экспорта (максимум 100,000 записей). Попробуйте уточнить фильтры.'
+        } else if (err.response?.data?.error) {
+          error.value = `Ошибка экспорта: ${err.response.data.error}`
+        } else {
+          error.value = `Не удалось экспортировать данные: ${err.message}`
+        }
+      } finally {
+        exporting.value = false
+      }
+    }
+
     onMounted(() => {
       loadDomains()
     })
@@ -328,6 +386,7 @@ export default {
       domains,
       loading,
       error,
+      exporting,
       filters,
       currentPage,
       pagination,
@@ -341,7 +400,8 @@ export default {
       resetFilters,
       prevPage,
       nextPage,
-      formatDate
+      formatDate,
+      exportToExcel
     }
   }
 }

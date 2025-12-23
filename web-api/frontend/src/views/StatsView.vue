@@ -57,6 +57,13 @@
       <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
         <button @click="applyFilters" class="btn btn-primary">Apply Filters</button>
         <button @click="resetFilters" class="btn btn-secondary">Reset</button>
+        <button
+          @click="exportToExcel"
+          :disabled="exporting || loading || stats.length === 0"
+          class="btn btn-primary"
+        >
+          {{ exporting ? 'Exporting...' : 'Export to Excel' }}
+        </button>
       </div>
     </div>
 
@@ -137,7 +144,7 @@
 
 <script>
 import { ref, onMounted } from 'vue'
-import { getStats } from '../api/api'
+import { getStats, exportStats } from '../api/api'
 import { format } from 'date-fns'
 
 export default {
@@ -146,6 +153,7 @@ export default {
     const stats = ref([])
     const loading = ref(false)
     const error = ref(null)
+    const exporting = ref(false)
     const currentPage = ref(1)
     const pagination = ref({
       total: 0,
@@ -268,6 +276,59 @@ export default {
       return format(new Date(dateStr), 'yyyy-MM-dd HH:mm:ss')
     }
 
+    const exportToExcel = async () => {
+      exporting.value = true
+      error.value = null
+
+      try {
+        const params = {
+          sort_by: filters.value.sortBy,
+          sort_order: filters.value.sortOrder
+        }
+
+        if (filters.value.clientIPs) {
+          params.client_ips = filters.value.clientIPs
+        }
+        if (filters.value.subnet) {
+          params.subnet = filters.value.subnet
+        }
+        if (filters.value.dateFrom) {
+          params.date_from = new Date(filters.value.dateFrom).toISOString()
+        }
+        if (filters.value.dateTo) {
+          params.date_to = new Date(filters.value.dateTo).toISOString()
+        }
+
+        const response = await exportStats(params)
+
+        // Create blob and download
+        const url = window.URL.createObjectURL(new Blob([response.data]))
+        const link = document.createElement('a')
+        link.href = url
+
+        // Extract filename from header
+        const disposition = response.headers['content-disposition']
+        const filename = disposition?.match(/filename="(.+)"/)?.[1] || 'dns-stats.xlsx'
+
+        link.download = filename
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        window.URL.revokeObjectURL(url)
+      } catch (err) {
+        console.error('Failed to export stats:', err)
+        if (err.response?.status === 413) {
+          error.value = 'Данные слишком большие для экспорта (максимум 100,000 записей). Попробуйте уточнить фильтры.'
+        } else if (err.response?.data?.error) {
+          error.value = `Ошибка экспорта: ${err.response.data.error}`
+        } else {
+          error.value = `Не удалось экспортировать данные: ${err.message}`
+        }
+      } finally {
+        exporting.value = false
+      }
+    }
+
     onMounted(() => {
       loadStats()
     })
@@ -276,6 +337,7 @@ export default {
       stats,
       loading,
       error,
+      exporting,
       filters,
       currentPage,
       pagination,
@@ -285,7 +347,8 @@ export default {
       resetFilters,
       prevPage,
       nextPage,
-      formatDate
+      formatDate,
+      exportToExcel
     }
   }
 }
