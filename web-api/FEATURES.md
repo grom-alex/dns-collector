@@ -87,6 +87,12 @@ Web API предоставляет полнофункциональный веб
 - Health check endpoint
 - Статус сервиса
 
+**GET /export/{endpoint}**
+- Экспорт IP адресов и доменов в plain text
+- Фильтрация по regex для доменных имен
+- Формат для pfSense firewall alias tables
+- HTTP кеширование (5 минут)
+
 #### Формат ответа
 
 ```json
@@ -244,6 +250,40 @@ done
 sqlite3 data/stats.db "SELECT domain, COUNT(*) as count FROM domain_stat GROUP BY domain ORDER BY count DESC LIMIT 10;"
 ```
 
+### Сценарий 6: Экспорт списков для pfSense
+
+**Задача**: Настроить автоматическое обновление firewall alias в pfSense
+
+**Решение**:
+1. Настройте export list в `config/config.yaml`:
+```yaml
+export_lists:
+  - name: "Blocked Domains"
+    endpoint: "/export/blocked"
+    domain_regex: "^(ads|tracking|malware)\\."
+    include_domains: true
+```
+
+2. В pfSense создайте URL Table Alias:
+   - Type: URL Table (IPs or Hostnames)
+   - URL: `http://your-server:8080/export/blocked`
+   - Update Frequency: 300 (5 минут)
+
+3. Используйте alias в firewall rules для блокировки
+
+**API**:
+```bash
+# Получение списка доменов и IP
+curl "http://localhost:8080/export/blocked"
+
+# Вывод:
+# ads.example.com
+# tracking.analytics.com
+# 192.0.2.1
+# 192.0.2.2
+# 2001:db8::1
+```
+
 ## Расширенные возможности
 
 ### Интеграция с другими системами
@@ -334,6 +374,56 @@ while true; do
 done
 ```
 
+### pfSense Firewall Integration
+
+**Реализовано в v2.3.0**: Полная интеграция с pfSense firewall через export lists
+
+#### Возможности
+- Экспорт доменов и IP в plain text формате
+- Фильтрация по регулярным выражениям (PostgreSQL синтаксис)
+- Настраиваемое включение/выключение доменов
+- Поддержка множественных списков
+- Автоматическая сортировка: домены → IPv4 → IPv6
+- HTTP кеширование для снижения нагрузки
+- Защита от ReDoS атак
+
+#### Безопасность
+- Валидация regex (длина ≤ 200 символов)
+- Блокировка опасных паттернов: `(.*)*`, `(.+)+`, `(.*)+`, `(.+)*`
+- Проверка дубликатов имен и endpoints
+- Валидация конфигурации при старте
+
+#### Примеры использования
+
+**Блокировка рекламных доменов:**
+```yaml
+export_lists:
+  - name: "Ad Blocklist"
+    endpoint: "/export/ads"
+    domain_regex: "^(ads|adservice|analytics|tracking)\\."
+    include_domains: true
+```
+
+**Экспорт только IP адресов CDN:**
+```yaml
+export_lists:
+  - name: "CDN IPs"
+    endpoint: "/export/cdn-ips"
+    domain_regex: "\\.(cloudflare|akamai|fastly)\\.com$"
+    include_domains: false
+```
+
+**Фильтрация по TLD:**
+```yaml
+export_lists:
+  - name: "RU Domains"
+    endpoint: "/export/ru"
+    domain_regex: "\\.ru$"
+    include_domains: true
+```
+
+Подробнее: [`web-api/EXPORT_LISTS.md`](EXPORT_LISTS.md)
+
 ## Будущие улучшения
 
 ### Планируемые возможности
@@ -345,9 +435,12 @@ done
 - Графики активности по времени
 - Geolocation IP адресов
 - Алерты и уведомления
+- Rate limiting для export endpoints
+- Query timeout для сложных regex
 
 ### Возможные интеграции
 - Prometheus/Grafana для метрик
 - Elasticsearch для full-text поиска
 - Redis для кеширования
 - Kafka для потоковой обработки
+- Integration tests с testcontainers-go
