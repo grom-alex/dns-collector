@@ -424,11 +424,82 @@ export_lists:
 
 Подробнее: [`web-api/EXPORT_LISTS.md`](EXPORT_LISTS.md)
 
+### 5. Excel экспорт (v2.3.2+)
+
+#### Экспорт статистики в Excel
+- **Endpoint**: `GET /api/stats/export`
+- **Формат**: Excel (.xlsx) с одним листом "DNS Statistics"
+- **Применение фильтров**: все фильтры из веб-интерфейса применяются к экспорту
+- **Лимит**: 100,000 записей (HTTP 413 при превышении)
+
+**Колонки:**
+- ID - уникальный идентификатор записи
+- Domain - доменное имя
+- Client IP - IP адрес клиента
+- Record Type - тип записи DNS
+- Timestamp - время запроса (yyyy-mm-dd hh:mm:ss)
+
+**Форматирование:**
+- Жирные заголовки с синим фоном (#4A90E2)
+- Закрепление первой строки (freeze panes)
+- Автофильтры на всех колонках
+- Оптимизированная ширина колонок
+- Профессиональный формат дат
+
+#### Экспорт доменов в Excel
+- **Endpoint**: `GET /api/domains/export`
+- **Формат**: Excel (.xlsx) с двумя листами
+- **Оптимизация**: bulk fetch IP адресов (один SQL запрос для всех доменов)
+- **Лимит**: 100,000 записей
+
+**Лист 1 "Domains":**
+- ID, Domain, First Seen, Resolution Count, Max Resolutions, Last Resolved
+
+**Лист 2 "IP Addresses":**
+- Domain, IP Address, Type (IPv4/IPv6), Resolved At
+
+**Особенности:**
+- Полное форматирование на обоих листах
+- Связь доменов с IP адресами через доменное имя
+- Удобная фильтрация и анализ в Excel
+
+#### Интеграция в веб-интерфейс
+- Кнопки "Export to Excel" в блоке фильтров
+- Индикаторы загрузки при экспорте
+- Автоматическая загрузка файла с правильным именем
+- Обработка ошибок (слишком большой датасет, ошибки сервера)
+
+#### Примеры использования
+
+**Экспорт всей статистики:**
+```bash
+curl -o dns-stats.xlsx "http://localhost:8080/api/stats/export"
+```
+
+**Экспорт с фильтрами:**
+```bash
+# Только запросы от конкретного IP
+curl -o client-stats.xlsx "http://localhost:8080/api/stats/export?client_ips=192.168.1.10"
+
+# Запросы из подсети за определенный период
+curl -o subnet-stats.xlsx "http://localhost:8080/api/stats/export?subnet=192.168.1.0/24&date_from=2024-12-01T00:00:00Z"
+```
+
+**Экспорт доменов:**
+```bash
+# Все домены
+curl -o all-domains.xlsx "http://localhost:8080/api/domains/export"
+
+# Домены, содержащие "google"
+curl -o google-domains.xlsx "http://localhost:8080/api/domains/export?domain_regex=.*google.*"
+```
+
 ## Будущие улучшения
 
 ### Планируемые возможности
 - Dashboard с графиками и статистикой
-- Экспорт в различные форматы (CSV, Excel)
+- ~~Экспорт в Excel (XLSX)~~ ✅ **Реализовано в v2.3.2**
+- Экспорт в CSV формат
 - WebSocket для real-time обновлений
 - Сохранение пользовательских фильтров
 - Темная тема интерфейса

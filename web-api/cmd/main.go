@@ -190,7 +190,9 @@ func main() {
 	api := router.Group("/api")
 	{
 		api.GET("/stats", h.GetStats)
+		api.GET("/stats/export", h.ExportStats)
 		api.GET("/domains", h.GetDomains)
+		api.GET("/domains/export", h.ExportDomains)
 		api.GET("/domains/:id", h.GetDomainByID)
 	}
 
