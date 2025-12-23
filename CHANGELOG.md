@@ -2,6 +2,66 @@
 
 All notable changes to DNS Collector will be documented in this file.
 
+## [2.3.1] - 2025-12-23
+
+### Fixed
+- **Export Lists**: Fixed domain name formatting for pfSense compatibility
+  - Removed trailing dots from FQDN format in export output
+  - Example: `gecko16-normal-c-useast1a.tiktokv.com.` → `gecko16-normal-c-useast1a.tiktokv.com`
+  - Ensures proper compatibility with pfSense firewall alias tables
+
+### Added
+- **Testing**: New test `TestExportList_RemoveTrailingDot` to verify dot removal
+- **Testing**: Updated `TestExportList_Success` with FQDN format in mock data
+
+### Technical Details
+- Modified `web-api/internal/handlers/handlers.go:203` to strip trailing dots using `strings.TrimSuffix`
+- All 88 tests passing with 85.4% handler coverage
+
+## [2.3.0] - 2025-12-22
+
+### Added
+- **Export Lists for pfSense**: New functionality to export IP addresses and domains in plain text format
+  - HTTP endpoints returning plain text (Content-Type: text/plain)
+  - Filtering by regex for domain names (PostgreSQL regex syntax)
+  - Configurable domain inclusion (domains + IPs or IPs only)
+  - Support for multiple lists with different criteria
+  - Automatic sorting: domains → IPv4 → IPv6
+  - HTTP caching headers (Cache-Control: public, max-age=300)
+
+- **Security Features**:
+  - ReDoS protection with dangerous pattern detection: `(.*)*`, `(.+)+`, `(.*)+`, `(.+)*`
+  - Regex length limit (200 characters)
+  - Configuration validation at startup (duplicate detection, required fields)
+
+- **Documentation**:
+  - New `web-api/EXPORT_LISTS.md` with pfSense integration guide
+  - New `.claude/DEVELOPMENT_WORKFLOW.md` for production deployment process
+  - Configuration examples in dev and production configs
+
+- **Testing**: 22 new tests added
+  - `TestExportList_Success`, `TestExportList_IPsOnly`, `TestExportList_EmptyResults`
+  - `TestExportList_DatabaseError`, `TestExportList_OnlyIPv4`
+  - Validation tests: `TestValidateExportLists_*` (9 tests)
+  - Config loading tests: `TestLoadConfig_*` (5 tests)
+  - Database validation tests: `TestGetExportList_*` (8 tests)
+
+### Technical Details
+- New database method: `GetExportList(domainRegex string)`
+- New HTTP handler: `ExportList(c *gin.Context, domainRegex string, includeDomains bool)`
+- New configuration structure: `ExportListConfig` with validation
+- Dynamic endpoint registration based on configuration
+- Defensive programming: panic prevention, empty result logging
+
+### Configuration
+```yaml
+export_lists:
+  - name: "Example Domain List"
+    endpoint: "/export/example"
+    domain_regex: "^example\\.com$"
+    include_domains: true
+```
+
 ## [1.0.1] - 2025-12-17
 
 ### Changed
