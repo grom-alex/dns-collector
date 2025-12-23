@@ -19,4 +19,12 @@ export const getDomainById = (id) => {
   return api.get(`/domains/${id}`)
 }
 
+export const exportStats = (params) => {
+  return api.get('/stats/export', { params, responseType: 'blob' })
+}
+
+export const exportDomains = (params) => {
+  return api.get('/domains/export', { params, responseType: 'blob' })
+}
+
 export default api

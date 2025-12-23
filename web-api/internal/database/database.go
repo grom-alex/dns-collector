@@ -327,6 +327,64 @@ func (db *Database) GetDomainWithIPs(domainID int64) (*models.Domain, error) {
 	return &d, nil
 }
 
+// GetDomainsWithIPs retrieves domains with all their IPs using bulk fetch to avoid N+1 queries
+func (db *Database) GetDomainsWithIPs(filter models.DomainsFilter) ([]models.Domain, int64, error) {
+	// First, get filtered domains
+	domains, total, err := db.GetDomains(filter)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if len(domains) == 0 {
+		return domains, total, nil
+	}
+
+	// Collect domain IDs and create map for quick lookup
+	domainIDs := make([]interface{}, len(domains))
+	domainMap := make(map[int64]*models.Domain)
+	for i := range domains {
+		domainIDs[i] = domains[i].ID
+		domainMap[domains[i].ID] = &domains[i]
+	}
+
+	// Build placeholders for IN clause
+	placeholders := make([]string, len(domainIDs))
+	for i := range domainIDs {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+	}
+
+	// Bulk fetch all IPs in ONE query
+	query := fmt.Sprintf(`
+		SELECT id, domain_id, ip, type, time
+		FROM ip
+		WHERE domain_id IN (%s)
+		ORDER BY domain_id, type, ip
+	`, strings.Join(placeholders, ","))
+
+	rows, err := db.DB.Query(query, domainIDs...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to fetch IPs: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	// Map IPs to domains
+	for rows.Next() {
+		var ip models.IP
+		if err := rows.Scan(&ip.ID, &ip.DomainID, &ip.IP, &ip.Type, &ip.Time); err != nil {
+			return nil, 0, fmt.Errorf("failed to scan IP: %w", err)
+		}
+		if domain, ok := domainMap[ip.DomainID]; ok {
+			domain.IPs = append(domain.IPs, ip)
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+
+	return domains, total, nil
+}
+
 // GetExportList retrieves domains and their IPs filtered by domain regex
 func (db *Database) GetExportList(domainRegex string) (*models.ExportList, error) {
 	// Validate regex pattern

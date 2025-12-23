@@ -2,6 +2,49 @@
 
 All notable changes to DNS Collector will be documented in this file.
 
+## [2.3.2] - 2025-12-24
+
+### Added
+- **Excel Export**: New functionality to export DNS statistics and domains to Excel (XLSX) format
+  - Export DNS statistics with full filtering support (client IPs, subnets, dates, sorting)
+  - Export domains with IP addresses in dual-sheet Excel files
+  - Full Excel formatting: bold headers, freeze panes, auto-filters, optimized column widths
+  - Date formatting: `yyyy-mm-dd hh:mm:ss`
+  - Export buttons integrated into filter blocks on Stats and Domains pages
+
+- **API Endpoints**:
+  - `GET /api/stats/export` - Export DNS query statistics to Excel
+  - `GET /api/domains/export` - Export domains with IPs to Excel (2 sheets)
+
+- **Performance Optimization**:
+  - New `GetDomainsWithIPs()` database method using bulk IP fetching
+  - Prevents N+1 query problem when exporting domains with IPs
+  - Single SQL query with IN clause for fetching all IPs
+
+- **Safety Features**:
+  - 100,000 record limit for exports
+  - HTTP 413 error response when dataset exceeds limit
+  - Clear error messages for users when export fails or dataset is too large
+
+### Frontend
+- Export to Excel buttons on Stats and Domains pages
+- Loading indicators during export operations
+- Automatic file download with proper filename extraction
+- Error handling with user-friendly messages
+
+### Backend
+- New `internal/excel` package with `Exporter` type
+- `ExportStats()` method: generates single-sheet Excel for DNS statistics
+- `ExportDomains()` method: generates two-sheet Excel (Domains + IP Addresses)
+- Comprehensive unit tests for Excel generation (12 test cases)
+
+### Technical Details
+- Added dependency: `github.com/xuri/excelize/v2 v2.10.0`
+- Excel Statistics sheet columns: ID, Domain, Client IP, Record Type, Timestamp
+- Excel Domains sheet columns: ID, Domain, First Seen, Resolution Count, Max Resolutions, Last Resolved
+- Excel IP Addresses sheet columns: Domain, IP Address, Type, Resolved At
+- All 88 existing tests still passing plus new Excel export tests
+
 ## [2.3.1] - 2025-12-23
 
 ### Fixed
