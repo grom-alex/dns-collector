@@ -21,21 +21,71 @@ cors:
 
 # Export lists for pfSense firewall alias tables
 # Configure domain filters and endpoints for IP/domain exports
+# New in v2.4.0: IPv4/IPv6 filtering, shared IP exclusion, additional static IPs
 export_lists:
-  # Example: Export specific domain and its IPs
-  # - name: "Blocked Domains"
-  #   endpoint: "/export/blocked"
-  #   domain_regex: "^(malware|phishing)\\..*$"
+  # Example 1: Basic export - all domains with IPs (backward compatible)
+  # - name: "All Domains"
+  #   endpoint: "/export/all"
+  #   domain_regex: ".*"
   #   include_domains: true
 
-  # Example: Export all IPs without domains
-  # - name: "All IPs"
-  #   endpoint: "/export/all-ips"
-  #   domain_regex: ".*"
-  #   include_domains: false
+  # Example 2: IPv4 only - useful for firewalls without IPv6 support
+  # - name: "Ad Blocklist IPv4"
+  #   endpoint: "/export/ads-ipv4"
+  #   domain_regex: "^(ads|adservice|adserver|doubleclick|analytics)\\..*$"
+  #   include_domains: true
+  #   include_ipv4: true
+  #   include_ipv6: false
 
-  # Example: Export specific TLD
-  # - name: "RU Domains"
-  #   endpoint: "/export/ru-domains"
+  # Example 3: Safe blocking with shared IP exclusion
+  # Prevents blocking CDN/cloud IPs used by legitimate sites
+  # - name: "Tracking Blocklist Safe"
+  #   endpoint: "/export/tracking"
+  #   excluded_ips_endpoint: "/export/tracking-excluded"  # Analyze excluded IPs
+  #   domain_regex: "^(tracking|telemetry|metrics)\\..*$"
+  #   include_domains: true
+  #   exclude_shared_ips: true  # Don't block IPs used by non-tracking domains
+
+  # Example 4: Separate IPv4 and IPv6 lists for different firewall rules
+  # - name: "Malware IPv4"
+  #   endpoint: "/export/malware-v4"
+  #   domain_regex: "\\.(malware|virus|trojan|botnet)\\."
+  #   include_domains: false  # IPs only
+  #   include_ipv4: true
+  #   include_ipv6: false
+  #
+  # - name: "Malware IPv6"
+  #   endpoint: "/export/malware-v6"
+  #   domain_regex: "\\.(malware|virus|trojan|botnet)\\."
+  #   include_domains: false
+  #   include_ipv4: false
+  #   include_ipv6: true
+
+  # Example 5: Extended blocklist with static IPs from threat intelligence
+  # - name: "Comprehensive Threat Blocklist"
+  #   endpoint: "/export/threats"
+  #   domain_regex: "^(malware|phishing|spam|botnet)\\..*$"
+  #   include_domains: false
+  #   include_ipv4: true
+  #   include_ipv6: true
+  #   exclude_shared_ips: true
+  #   additional_ips_file: "/app/config/threat-intel-ips.txt"  # Add known bad IPs
+
+  # Example 6: Corporate policy - block social/gaming with audit capability
+  # - name: "Corporate Blocklist"
+  #   endpoint: "/export/corporate"
+  #   excluded_ips_endpoint: "/export/corporate-excluded"
+  #   domain_regex: "^(facebook|twitter|instagram|gaming|steam)\\..*$"
+  #   include_domains: true
+  #   include_ipv4: true
+  #   include_ipv6: true
+  #   exclude_shared_ips: true  # Don't accidentally block cloud services
+  #   additional_ips_file: "/app/config/corporate-manual-blocks.txt"
+
+  # Example 7: Country-specific blocking (e.g., .ru TLD)
+  # - name: "RU Domains Blocklist"
+  #   endpoint: "/export/ru-block"
   #   domain_regex: ".*\\.ru$"
   #   include_domains: true
+  #   include_ipv4: true
+  #   include_ipv6: true
