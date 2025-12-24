@@ -8,6 +8,7 @@ type DB interface {
 	GetDomains(filter models.DomainsFilter) ([]models.Domain, int64, error)
 	GetDomainWithIPs(id int64) (*models.Domain, error)
 	GetDomainsWithIPs(filter models.DomainsFilter) ([]models.Domain, int64, error)
-	GetExportList(domainRegex string) (*models.ExportList, error)
+	GetExportList(domainRegex string, includeIPv4, includeIPv6, excludeSharedIPs bool) (*models.ExportList, error)
+	GetExcludedIPs(domainRegex string, includeIPv4, includeIPv6 bool) ([]models.ExcludedIPInfo, error)
 	Close() error
 }

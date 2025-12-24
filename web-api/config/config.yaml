@@ -24,11 +24,26 @@ export_lists:
     endpoint: "/export/example"
     domain_regex: "^example\\.com$"
     include_domains: true
-  - name: "Google Services"
-    endpoint: "/export/google"
-    domain_regex: ".*\\.google\\.com$"
-    include_domains: true
-  - name: "All Domains IPs Only"
-    endpoint: "/export/all-ips"
+
+  - name: "All Domains - IPv4 Only"
+    endpoint: "/export/all-ipv4"
     domain_regex: ".*"
-    include_domains: false
+    include_domains: true
+    include_ipv4: true
+    include_ipv6: false
+
+  - name: "All Domains - IPv6 Only"
+    endpoint: "/export/all-ipv6"
+    domain_regex: ".*"
+    include_domains: true
+    include_ipv4: false
+    include_ipv6: true
+
+  - name: "Test Excluded IPs"
+    endpoint: "/export/test-excluded"
+    excluded_ips_endpoint: "/export/test-excluded-ips"
+    domain_regex: "^(example|google)\\.com$"
+    include_domains: true
+    include_ipv4: true
+    include_ipv6: true
+    exclude_shared_ips: true

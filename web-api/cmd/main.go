@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -43,10 +45,39 @@ type Config struct {
 }
 
 type ExportListConfig struct {
-	Name           string `yaml:"name"`
-	Endpoint       string `yaml:"endpoint"`
-	DomainRegex    string `yaml:"domain_regex"`
-	IncludeDomains bool   `yaml:"include_domains"`
+	Name                 string `yaml:"name"`
+	Endpoint             string `yaml:"endpoint"`
+	DomainRegex          string `yaml:"domain_regex"`
+	IncludeDomains       bool   `yaml:"include_domains"`
+	IncludeIPv4          *bool  `yaml:"include_ipv4,omitempty"`
+	IncludeIPv6          *bool  `yaml:"include_ipv6,omitempty"`
+	ExcludeSharedIPs     *bool  `yaml:"exclude_shared_ips,omitempty"`
+	ExcludedIPsEndpoint  string `yaml:"excluded_ips_endpoint,omitempty"`
+	AdditionalIPsFile    string `yaml:"additional_ips_file,omitempty"`
+}
+
+// GetIncludeIPv4 returns the value of IncludeIPv4 or default (true)
+func (c *ExportListConfig) GetIncludeIPv4() bool {
+	if c.IncludeIPv4 == nil {
+		return true
+	}
+	return *c.IncludeIPv4
+}
+
+// GetIncludeIPv6 returns the value of IncludeIPv6 or default (true)
+func (c *ExportListConfig) GetIncludeIPv6() bool {
+	if c.IncludeIPv6 == nil {
+		return true
+	}
+	return *c.IncludeIPv6
+}
+
+// GetExcludeSharedIPs returns the value of ExcludeSharedIPs or default (false)
+func (c *ExportListConfig) GetExcludeSharedIPs() bool {
+	if c.ExcludeSharedIPs == nil {
+		return false
+	}
+	return *c.ExcludeSharedIPs
 }
 
 func loadConfig(path string) (*Config, error) {
@@ -107,6 +138,58 @@ func validateExportLists(lists []ExportListConfig) error {
 		// Validate endpoint starts with / (defensive check for length)
 		if len(list.Endpoint) == 0 || list.Endpoint[0] != '/' {
 			return fmt.Errorf("export list '%s': endpoint must start with /", list.Name)
+		}
+
+		// Validate at least one of include_domains, include_ipv4, include_ipv6 is true
+		includeIPv4 := list.GetIncludeIPv4()
+		includeIPv6 := list.GetIncludeIPv6()
+
+		if !includeIPv4 && !includeIPv6 && !list.IncludeDomains {
+			return fmt.Errorf("export list '%s': at least one of include_domains, include_ipv4, or include_ipv6 must be true", list.Name)
+		}
+
+		// Warn if exclude_shared_ips is enabled but no IP types are enabled
+		if list.GetExcludeSharedIPs() && !includeIPv4 && !includeIPv6 {
+			log.Printf("Warning: export list '%s' has exclude_shared_ips=true but no IP types enabled", list.Name)
+		}
+
+		// Validate excluded_ips_endpoint
+		if list.ExcludedIPsEndpoint != "" {
+			// Must start with /
+			if !strings.HasPrefix(list.ExcludedIPsEndpoint, "/") {
+				return fmt.Errorf("export list '%s': excluded_ips_endpoint must start with '/'", list.Name)
+			}
+
+			// Check for duplicate endpoints (with both main and excluded endpoints)
+			if endpoints[list.ExcludedIPsEndpoint] {
+				return fmt.Errorf("export list '%s': excluded_ips_endpoint '%s' conflicts with another endpoint", list.Name, list.ExcludedIPsEndpoint)
+			}
+			endpoints[list.ExcludedIPsEndpoint] = true
+
+			// Warn if excluded endpoint is set but exclude_shared_ips is false
+			if !list.GetExcludeSharedIPs() {
+				log.Printf("Warning: export list '%s' has excluded_ips_endpoint but exclude_shared_ips is false", list.Name)
+			}
+		}
+
+		// Validate additional_ips_file
+		if list.AdditionalIPsFile != "" {
+			// Must be absolute path
+			if !filepath.IsAbs(list.AdditionalIPsFile) {
+				return fmt.Errorf("export list '%s': additional_ips_file must be an absolute path", list.Name)
+			}
+
+			// Must be within allowed config directory
+			// Note: We'll check AllowedConfigDir constant when we create the utils package
+			allowedConfigDir := "/app/config"
+			if !strings.HasPrefix(list.AdditionalIPsFile, allowedConfigDir) {
+				return fmt.Errorf("export list '%s': additional_ips_file must be within %s", list.Name, allowedConfigDir)
+			}
+
+			// Check if file exists (warning only, not error)
+			if _, err := os.Stat(list.AdditionalIPsFile); os.IsNotExist(err) {
+				log.Printf("Warning: export list '%s' references non-existent additional_ips_file: %s", list.Name, list.AdditionalIPsFile)
+			}
 		}
 	}
 
@@ -198,11 +281,41 @@ func main() {
 
 	// Register export list endpoints
 	for _, exportList := range cfg.ExportLists {
-		listConfig := exportList
-		router.GET(listConfig.Endpoint, func(c *gin.Context) {
-			h.ExportList(c, listConfig.DomainRegex, listConfig.IncludeDomains)
+		// Capture loop variables to avoid closure issues
+		domainRegex := exportList.DomainRegex
+		includeDomains := exportList.IncludeDomains
+		includeIPv4 := exportList.GetIncludeIPv4()
+		includeIPv6 := exportList.GetIncludeIPv6()
+		excludeSharedIPs := exportList.GetExcludeSharedIPs()
+		additionalIPsFile := exportList.AdditionalIPsFile
+		endpoint := exportList.Endpoint
+		excludedEndpoint := exportList.ExcludedIPsEndpoint
+		listName := exportList.Name
+
+		// Register main export endpoint
+		router.GET(endpoint, func(c *gin.Context) {
+			h.ExportList(c,
+				domainRegex,
+				includeDomains,
+				includeIPv4,
+				includeIPv6,
+				excludeSharedIPs,
+				additionalIPsFile,
+			)
 		})
-		log.Printf("Registered export list '%s' at %s", listConfig.Name, listConfig.Endpoint)
+		log.Printf("Registered export list '%s' at %s", listName, endpoint)
+
+		// Register excluded IPs endpoint if configured
+		if excludedEndpoint != "" {
+			router.GET(excludedEndpoint, func(c *gin.Context) {
+				h.ExportExcludedIPs(c,
+					domainRegex,
+					includeIPv4,
+					includeIPv6,
+				)
+			})
+			log.Printf("Registered excluded IPs endpoint for '%s' at %s", listName, excludedEndpoint)
+		}
 	}
 
 	// Serve static files for frontend

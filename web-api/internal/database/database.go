@@ -386,7 +386,7 @@ func (db *Database) GetDomainsWithIPs(filter models.DomainsFilter) ([]models.Dom
 }
 
 // GetExportList retrieves domains and their IPs filtered by domain regex
-func (db *Database) GetExportList(domainRegex string) (*models.ExportList, error) {
+func (db *Database) GetExportList(domainRegex string, includeIPv4, includeIPv6, excludeSharedIPs bool) (*models.ExportList, error) {
 	// Validate regex pattern
 	if domainRegex == "" {
 		return nil, fmt.Errorf("domain regex is required")
@@ -435,14 +435,55 @@ func (db *Database) GetExportList(domainRegex string) (*models.ExportList, error
 		return nil, err
 	}
 
-	// Query to get unique IPs for matching domains
-	ipsQuery := `
-		SELECT DISTINCT ip.ip, ip.type
-		FROM ip
-		INNER JOIN domain ON ip.domain_id = domain.id
-		WHERE domain.domain ~ $1
-		ORDER BY ip.type, ip.ip
-	`
+	// If neither IPv4 nor IPv6 is enabled, return early with just domains
+	if !includeIPv4 && !includeIPv6 {
+		return &models.ExportList{
+			Domains: domains,
+			IPv4:    []string{},
+			IPv6:    []string{},
+		}, nil
+	}
+
+	// Build IP query with type filtering and optional shared IP exclusion
+	var ipsQuery string
+	if excludeSharedIPs {
+		// Complex query with CTE to exclude IPs shared between matched and non-matched domains
+		ipsQuery = `
+			WITH matched_ips AS (
+				SELECT DISTINCT ip.ip, ip.type
+				FROM ip
+				INNER JOIN domain ON ip.domain_id = domain.id
+				WHERE domain.domain ~ $1
+			),
+			non_matched_ips AS (
+				SELECT DISTINCT ip.ip
+				FROM ip
+				INNER JOIN domain ON ip.domain_id = domain.id
+				WHERE NOT (domain.domain ~ $1)
+			)
+			SELECT ip, type
+			FROM matched_ips
+			WHERE ip NOT IN (SELECT ip FROM non_matched_ips)
+		`
+	} else {
+		// Simple query without shared IP exclusion
+		ipsQuery = `
+			SELECT DISTINCT ip.ip, ip.type
+			FROM ip
+			INNER JOIN domain ON ip.domain_id = domain.id
+			WHERE domain.domain ~ $1
+		`
+	}
+
+	// Add type filtering
+	if includeIPv4 && !includeIPv6 {
+		ipsQuery += " AND ip.type = 'ipv4'"
+	} else if !includeIPv4 && includeIPv6 {
+		ipsQuery += " AND ip.type = 'ipv6'"
+	}
+	// If both are true, no type filter needed
+
+	ipsQuery += " ORDER BY type, ip"
 
 	rows, err = db.DB.Query(ipsQuery, domainRegex)
 	if err != nil {
@@ -475,4 +516,131 @@ func (db *Database) GetExportList(domainRegex string) (*models.ExportList, error
 		IPv4:    ipv4List,
 		IPv6:    ipv6List,
 	}, nil
+}
+
+// GetExcludedIPs retrieves IPs that are excluded from export due to being shared
+// between matched and non-matched domains
+func (db *Database) GetExcludedIPs(domainRegex string, includeIPv4, includeIPv6 bool) ([]models.ExcludedIPInfo, error) {
+	// Validate regex pattern
+	if domainRegex == "" {
+		return nil, fmt.Errorf("domain regex is required")
+	}
+	if len(domainRegex) > 200 {
+		return nil, fmt.Errorf("regex pattern too long (max 200 characters)")
+	}
+
+	// Check for potentially dangerous patterns
+	dangerousPatterns := []string{
+		"(.*)*",
+		"(.+)+",
+		"(.*)+",
+		"(.+)*",
+	}
+	for _, dangerous := range dangerousPatterns {
+		if strings.Contains(domainRegex, dangerous) {
+			return nil, fmt.Errorf("regex pattern contains potentially dangerous construct: %s", dangerous)
+		}
+	}
+
+	// Build type filter condition
+	typeFilter := ""
+	if includeIPv4 && !includeIPv6 {
+		typeFilter = " AND ip.type = 'ipv4'"
+	} else if !includeIPv4 && includeIPv6 {
+		typeFilter = " AND ip.type = 'ipv6'"
+	}
+	// If both are true or both are false, no type filter
+
+	// Query to find IPs that appear in both matched and non-matched domains
+	query := fmt.Sprintf(`
+		WITH matched_domain_ips AS (
+			SELECT DISTINCT ip.ip, domain.domain
+			FROM ip
+			INNER JOIN domain ON ip.domain_id = domain.id
+			WHERE domain.domain ~ $1%s
+		),
+		non_matched_domain_ips AS (
+			SELECT DISTINCT ip.ip, domain.domain
+			FROM ip
+			INNER JOIN domain ON ip.domain_id = domain.id
+			WHERE NOT (domain.domain ~ $1)%s
+		),
+		shared_ips AS (
+			SELECT DISTINCT m.ip
+			FROM matched_domain_ips m
+			INNER JOIN non_matched_domain_ips nm ON m.ip = nm.ip
+		)
+		SELECT
+			s.ip,
+			ARRAY_AGG(DISTINCT m.domain ORDER BY m.domain) AS matched_domains,
+			ARRAY_AGG(DISTINCT nm.domain ORDER BY nm.domain) AS non_matched_domains
+		FROM shared_ips s
+		LEFT JOIN matched_domain_ips m ON s.ip = m.ip
+		LEFT JOIN non_matched_domain_ips nm ON s.ip = nm.ip
+		GROUP BY s.ip
+		ORDER BY s.ip
+	`, typeFilter, typeFilter)
+
+	rows, err := db.DB.Query(query, domainRegex)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query excluded IPs: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var result []models.ExcludedIPInfo
+	for rows.Next() {
+		var info models.ExcludedIPInfo
+		var matchedDomains, nonMatchedDomains string
+
+		// PostgreSQL array_agg returns comma-separated string in Go when using array_agg with text
+		// We need to use pq.Array for proper array handling
+		if err := rows.Scan(&info.IP, &matchedDomains, &nonMatchedDomains); err != nil {
+			return nil, fmt.Errorf("failed to scan excluded IP info: %w", err)
+		}
+
+		// Parse the PostgreSQL array format {domain1,domain2,...}
+		info.MatchedDomains = parsePostgreSQLArray(matchedDomains)
+		info.NonMatchedDomains = parsePostgreSQLArray(nonMatchedDomains)
+
+		result = append(result, info)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// parsePostgreSQLArray parses PostgreSQL array format {item1,item2,...} to Go slice
+func parsePostgreSQLArray(s string) []string {
+	// Remove leading { and trailing }
+	s = strings.TrimSpace(s)
+	if len(s) < 2 {
+		return []string{}
+	}
+	if s[0] == '{' && s[len(s)-1] == '}' {
+		s = s[1 : len(s)-1]
+	}
+
+	// Handle empty array
+	if s == "" {
+		return []string{}
+	}
+
+	// Split by comma
+	items := strings.Split(s, ",")
+	result := make([]string, 0, len(items))
+	for _, item := range items {
+		item = strings.TrimSpace(item)
+		// Remove quotes if present
+		if len(item) > 1 && item[0] == '"' && item[len(item)-1] == '"' {
+			item = item[1 : len(item)-1]
+		}
+		if item != "" {
+			result = append(result, item)
+		}
+	}
+
+	return result
 }
