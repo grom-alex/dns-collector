@@ -164,20 +164,20 @@ func (db *Database) InsertOrGetDomain(domain string, maxResolv int) (*Domain, er
 	// Use INSERT ... ON CONFLICT for upsert
 	var d Domain
 	err := db.DB.QueryRow(
-		`INSERT INTO domain (domain, time_insert, resolv_count, max_resolv, last_resolv_time)
-		VALUES ($1, $2, 0, $3, $4)
+		`INSERT INTO domain (domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen)
+		VALUES ($1, $2, 0, $3, $4, $5)
 		ON CONFLICT (domain) DO NOTHING
-		RETURNING id, domain, time_insert, resolv_count, max_resolv, last_resolv_time`,
-		domain, now, maxResolv, now,
-	).Scan(&d.ID, &d.Domain, &d.TimeInsert, &d.ResolvCount, &d.MaxResolv, &d.LastResolvTime)
+		RETURNING id, domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen`,
+		domain, now, maxResolv, now, now,
+	).Scan(&d.ID, &d.Domain, &d.TimeInsert, &d.ResolvCount, &d.MaxResolv, &d.LastResolvTime, &d.LastSeen)
 
 	if err == sql.ErrNoRows {
 		// Domain already exists, fetch it
 		err = db.DB.QueryRow(
-			`SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time
+			`SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen
 			FROM domain WHERE domain = $1`,
 			domain,
-		).Scan(&d.ID, &d.Domain, &d.TimeInsert, &d.ResolvCount, &d.MaxResolv, &d.LastResolvTime)
+		).Scan(&d.ID, &d.Domain, &d.TimeInsert, &d.ResolvCount, &d.MaxResolv, &d.LastResolvTime, &d.LastSeen)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get existing domain: %w", err)
 		}
