@@ -14,7 +14,8 @@
       "Bash(docker run:*)",
       "Bash(docker inspect:*)",
       "Bash(make test-unit:*)",
-      "Bash(make test:*)"
+      "Bash(make test:*)",
+      "Bash(docker push:*)"
     ]
   }
 }

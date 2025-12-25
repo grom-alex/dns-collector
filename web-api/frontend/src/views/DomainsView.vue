@@ -88,6 +88,9 @@
               <th @click="sortBy('time_insert')">
                 First Seen {{ sortIcon('time_insert') }}
               </th>
+              <th @click="sortBy('last_seen')">
+                Last Seen {{ sortIcon('last_seen') }}
+              </th>
               <th @click="sortBy('resolv_count')">
                 Resolv Count {{ sortIcon('resolv_count') }}
               </th>
@@ -103,6 +106,7 @@
                 <td>{{ domain.id }}</td>
                 <td><strong>{{ domain.domain }}</strong></td>
                 <td>{{ formatDate(domain.time_insert) }}</td>
+                <td>{{ formatDate(domain.last_seen) }}</td>
                 <td>
                   <span :class="{'text-success': domain.resolv_count >= domain.max_resolv}">
                     {{ domain.resolv_count }} / {{ domain.max_resolv }}
@@ -119,7 +123,7 @@
                 </td>
               </tr>
               <tr v-if="expandedDomain === domain.id && domainDetails[domain.id]" class="details-row">
-                <td colspan="6">
+                <td colspan="7">
                   <div class="ip-details">
                     <h3>Resolved IP Addresses for {{ domain.domain }}</h3>
                     <div v-if="loadingDetails" class="loading">Loading IP addresses...</div>

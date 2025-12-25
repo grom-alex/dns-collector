@@ -179,7 +179,7 @@ func (db *Database) GetStats(filter models.StatsFilter) ([]models.DomainStat, in
 
 // GetDomains retrieves domains with filtering and sorting
 func (db *Database) GetDomains(filter models.DomainsFilter) ([]models.Domain, int64, error) {
-	query := "SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time FROM domain WHERE 1=1"
+	query := "SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen FROM domain WHERE 1=1"
 	countQuery := "SELECT COUNT(*) FROM domain WHERE 1=1"
 	args := []interface{}{}
 	argPos := 1
@@ -234,7 +234,7 @@ func (db *Database) GetDomains(filter models.DomainsFilter) ([]models.Domain, in
 	// Apply sorting
 	validSortFields := map[string]bool{
 		"id": true, "domain": true, "time_insert": true,
-		"resolv_count": true, "max_resolv": true, "last_resolv_time": true,
+		"resolv_count": true, "max_resolv": true, "last_resolv_time": true, "last_seen": true,
 	}
 	sortBy := "time_insert"
 	if filter.SortBy != "" && validSortFields[filter.SortBy] {
@@ -271,7 +271,7 @@ func (db *Database) GetDomains(filter models.DomainsFilter) ([]models.Domain, in
 	var domains []models.Domain
 	for rows.Next() {
 		var d models.Domain
-		if err := rows.Scan(&d.ID, &d.Domain, &d.TimeInsert, &d.ResolvCount, &d.MaxResolv, &d.LastResolvTime); err != nil {
+		if err := rows.Scan(&d.ID, &d.Domain, &d.TimeInsert, &d.ResolvCount, &d.MaxResolv, &d.LastResolvTime, &d.LastSeen); err != nil {
 			return nil, 0, fmt.Errorf("failed to scan domain: %w", err)
 		}
 		domains = append(domains, d)
@@ -304,11 +304,11 @@ func (db *Database) GetDomainIPs(domainID int64) ([]models.IP, error) {
 
 // GetDomainWithIPs retrieves a domain with all its IPs
 func (db *Database) GetDomainWithIPs(domainID int64) (*models.Domain, error) {
-	query := "SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time FROM domain WHERE id = $1"
+	query := "SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen FROM domain WHERE id = $1"
 
 	var d models.Domain
 	err := db.DB.QueryRow(query, domainID).Scan(
-		&d.ID, &d.Domain, &d.TimeInsert, &d.ResolvCount, &d.MaxResolv, &d.LastResolvTime,
+		&d.ID, &d.Domain, &d.TimeInsert, &d.ResolvCount, &d.MaxResolv, &d.LastResolvTime, &d.LastSeen,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {

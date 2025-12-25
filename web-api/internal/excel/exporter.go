@@ -198,7 +198,7 @@ func (e *Exporter) ExportDomains(domains []models.Domain) (*excelize.File, error
 	}
 
 	// Sheet 1: Domains
-	headers := []string{"ID", "Domain", "First Seen", "Resolution Count", "Max Resolutions", "Last Resolved"}
+	headers := []string{"ID", "Domain", "First Seen", "Last Seen", "Resolution Count", "Max Resolutions", "Last Resolved"}
 	for i, header := range headers {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
 		if err := f.SetCellValue(domainsSheet, cell, header); err != nil {
@@ -214,9 +214,10 @@ func (e *Exporter) ExportDomains(domains []models.Domain) (*excelize.File, error
 		"A": 10, // ID
 		"B": 35, // Domain
 		"C": 20, // First Seen
-		"D": 18, // Resolution Count
-		"E": 18, // Max Resolutions
-		"F": 20, // Last Resolved
+		"D": 20, // Last Seen
+		"E": 18, // Resolution Count
+		"F": 18, // Max Resolutions
+		"G": 20, // Last Resolved
 	}
 	for col, width := range columnWidths {
 		if err := f.SetColWidth(domainsSheet, col, col, width); err != nil {
@@ -236,9 +237,10 @@ func (e *Exporter) ExportDomains(domains []models.Domain) (*excelize.File, error
 			{1, domain.ID, 0},
 			{2, domain.Domain, 0},
 			{3, domain.TimeInsert, dateStyle},
-			{4, domain.ResolvCount, 0},
-			{5, domain.MaxResolv, 0},
-			{6, domain.LastResolvTime, dateStyle},
+			{4, domain.LastSeen, dateStyle},
+			{5, domain.ResolvCount, 0},
+			{6, domain.MaxResolv, 0},
+			{7, domain.LastResolvTime, dateStyle},
 		}
 
 		for _, c := range cells {
@@ -268,7 +270,7 @@ func (e *Exporter) ExportDomains(domains []models.Domain) (*excelize.File, error
 
 	// Add auto-filter to Domains sheet
 	if len(domains) > 0 {
-		lastCol, _ := excelize.CoordinatesToCellName(6, len(domains)+1)
+		lastCol, _ := excelize.CoordinatesToCellName(7, len(domains)+1)
 		filterRange := fmt.Sprintf("A1:%s", lastCol)
 		if err := f.AutoFilter(domainsSheet, filterRange, []excelize.AutoFilterOptions{}); err != nil {
 			return nil, fmt.Errorf("failed to add auto-filter: %w", err)

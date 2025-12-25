@@ -206,7 +206,7 @@ func TestExportDomains(t *testing.T) {
 			t.Errorf("Expected domain 'example.com', got %s (error: %v)", domain, err)
 		}
 
-		resolvCount, err := file.GetCellValue("Domains", "D2")
+		resolvCount, err := file.GetCellValue("Domains", "E2")
 		if err != nil || resolvCount != "10" {
 			t.Errorf("Expected resolv count '10', got %s (error: %v)", resolvCount, err)
 		}
@@ -306,9 +306,10 @@ func verifyDomainsHeaders(t *testing.T, file *excelize.File, sheetName string) {
 		{"A1", "ID"},
 		{"B1", "Domain"},
 		{"C1", "First Seen"},
-		{"D1", "Resolution Count"},
-		{"E1", "Max Resolutions"},
-		{"F1", "Last Resolved"},
+		{"D1", "Last Seen"},
+		{"E1", "Resolution Count"},
+		{"F1", "Max Resolutions"},
+		{"G1", "Last Resolved"},
 	}
 
 	for _, h := range expectedHeaders {
