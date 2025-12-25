@@ -376,12 +376,16 @@ done
 
 ### pfSense Firewall Integration
 
-**Реализовано в v2.3.0**: Полная интеграция с pfSense firewall через export lists
+**Реализовано в v2.3.0, расширено в v2.4.0**: Полная интеграция с pfSense firewall через export lists
 
 #### Возможности
 - Экспорт доменов и IP в plain text формате
 - Фильтрация по регулярным выражениям (PostgreSQL синтаксис)
 - Настраиваемое включение/выключение доменов
+- **NEW in v2.4.0**: Раздельная фильтрация IPv4 и IPv6 адресов
+- **NEW in v2.4.0**: Исключение shared IP адресов (CDN, облачные сервисы)
+- **NEW in v2.4.0**: Endpoint для анализа исключенных IP
+- **NEW in v2.4.0**: Добавление статических IP из внешних файлов
 - Поддержка множественных списков
 - Автоматическая сортировка: домены → IPv4 → IPv6
 - HTTP кеширование для снижения нагрузки
@@ -420,6 +424,32 @@ export_lists:
     endpoint: "/export/ru"
     domain_regex: "\\.ru$"
     include_domains: true
+```
+
+**NEW in v2.4.0 - IPv4-only с исключением shared IP:**
+```yaml
+export_lists:
+  - name: "Ad Blocklist IPv4 Safe"
+    endpoint: "/export/ads-ipv4"
+    excluded_ips_endpoint: "/export/ads-ipv4-excluded"
+    domain_regex: "^(ads|adservice|tracking)\\."
+    include_domains: true
+    include_ipv4: true
+    include_ipv6: false
+    exclude_shared_ips: true
+```
+
+**NEW in v2.4.0 - Расширенный blocklist с threat intelligence:**
+```yaml
+export_lists:
+  - name: "Malware Extended"
+    endpoint: "/export/malware"
+    domain_regex: "\\.(malware|virus|trojan)\\."
+    include_domains: false
+    include_ipv4: true
+    include_ipv6: true
+    exclude_shared_ips: true
+    additional_ips_file: "/app/config/threat-intel-ips.txt"
 ```
 
 Подробнее: [`web-api/EXPORT_LISTS.md`](EXPORT_LISTS.md)
