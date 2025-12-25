@@ -6,9 +6,9 @@
 -- Add last_seen column
 ALTER TABLE domain ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP;
 
--- Initialize last_seen from existing data
--- Use last_resolv_time if available, otherwise use time_insert
-UPDATE domain SET last_seen = COALESCE(last_resolv_time, time_insert)
+-- Initialize last_seen for existing domains with current time
+-- All existing domains are treated as "recently seen" at migration time
+UPDATE domain SET last_seen = NOW()
 WHERE last_seen IS NULL;
 
 -- Add index for efficient cleanup queries
