@@ -11,6 +11,7 @@ import (
 type Service struct {
 	db              *database.Database
 	retentionDays   int
+	ipTTLDays       int
 	cleanupInterval time.Duration
 	stopChan        chan struct{}
 	doneChan        chan struct{}
@@ -20,6 +21,7 @@ func NewService(cfg *config.Config, db *database.Database) *Service {
 	return &Service{
 		db:              db,
 		retentionDays:   cfg.Retention.StatsDays,
+		ipTTLDays:       cfg.Retention.IPTTLDays,
 		cleanupInterval: time.Duration(cfg.Retention.CleanupIntervalHours) * time.Hour,
 		stopChan:        make(chan struct{}),
 		doneChan:        make(chan struct{}),
@@ -27,7 +29,7 @@ func NewService(cfg *config.Config, db *database.Database) *Service {
 }
 
 func (s *Service) Start() {
-	log.Printf("Starting cleanup service (retention: %d days)", s.retentionDays)
+	log.Printf("Starting cleanup service (stats retention: %d days, IP TTL: %d days)", s.retentionDays, s.ipTTLDays)
 
 	// Run cleanup immediately on startup
 	s.cleanup()
@@ -59,17 +61,25 @@ func (s *Service) run() {
 }
 
 func (s *Service) cleanup() {
-	log.Printf("Running statistics cleanup (removing records older than %d days)...", s.retentionDays)
+	log.Printf("Running cleanup (stats: %d days, IP TTL: %d days)...", s.retentionDays, s.ipTTLDays)
 
-	deleted, err := s.db.DeleteOldStats(s.retentionDays)
+	// 1. Cleanup old statistics
+	statsDeleted, err := s.db.DeleteOldStats(s.retentionDays)
 	if err != nil {
-		log.Printf("Error during cleanup: %v", err)
-		return
+		log.Printf("Error during stats cleanup: %v", err)
+	} else if statsDeleted > 0 {
+		log.Printf("Stats cleanup: deleted %d old records", statsDeleted)
 	}
 
-	if deleted > 0 {
-		log.Printf("Cleanup completed: deleted %d old statistics records", deleted)
-	} else {
-		log.Println("Cleanup completed: no old records to delete")
+	// 2. Cleanup expired IP addresses (only for active domains)
+	if s.ipTTLDays > 0 {
+		ipsDeleted, err := s.db.DeleteExpiredIPs(s.ipTTLDays)
+		if err != nil {
+			log.Printf("Error during IP cleanup: %v", err)
+		} else if ipsDeleted > 0 {
+			log.Printf("IP cleanup: deleted %d expired IP addresses", ipsDeleted)
+		}
 	}
+
+	log.Println("Cleanup completed")
 }

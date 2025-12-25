@@ -95,15 +95,16 @@ func TestGetDomainsToResolve(t *testing.T) {
 	database := &Database{DB: db}
 	now := time.Now()
 
-	rows := sqlmock.NewRows([]string{"id", "domain", "time_insert", "resolv_count", "max_resolv", "last_resolv_time"}).
-		AddRow(1, "example.com", now, 0, 10, now).
-		AddRow(2, "test.com", now, 3, 10, now)
+	rows := sqlmock.NewRows([]string{"id", "domain", "time_insert", "resolv_count", "max_resolv", "last_resolv_time", "last_seen"}).
+		AddRow(1, "example.com", now, 0, 10, now, now).
+		AddRow(2, "test.com", now, 3, 10, now, now)
 
-	mock.ExpectQuery(`SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time FROM domain WHERE resolv_count < max_resolv ORDER BY last_resolv_time ASC LIMIT`).
+	mock.ExpectQuery(`SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen FROM domain WHERE resolv_count < max_resolv ORDER BY last_resolv_time ASC LIMIT`).
 		WithArgs(10).
 		WillReturnRows(rows)
 
-	domains, err := database.GetDomainsToResolve(10)
+	// Test legacy mode (cyclicMode = false)
+	domains, err := database.GetDomainsToResolve(10, false, 0)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -133,13 +134,14 @@ func TestGetDomainsToResolve_Empty(t *testing.T) {
 
 	database := &Database{DB: db}
 
-	rows := sqlmock.NewRows([]string{"id", "domain", "time_insert", "resolv_count", "max_resolv", "last_resolv_time"})
+	rows := sqlmock.NewRows([]string{"id", "domain", "time_insert", "resolv_count", "max_resolv", "last_resolv_time", "last_seen"})
 
-	mock.ExpectQuery(`SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time FROM domain WHERE resolv_count < max_resolv`).
+	mock.ExpectQuery(`SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen FROM domain WHERE resolv_count < max_resolv`).
 		WithArgs(10).
 		WillReturnRows(rows)
 
-	domains, err := database.GetDomainsToResolve(10)
+	// Test legacy mode (cyclicMode = false)
+	domains, err := database.GetDomainsToResolve(10, false, 0)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -189,7 +191,8 @@ func TestUpdateDomainResolvStats(t *testing.T) {
 		WithArgs(sqlmock.AnyArg(), int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
-	err = database.UpdateDomainResolvStats(1)
+	// Test legacy mode (cyclicMode = false)
+	err = database.UpdateDomainResolvStats(1, false)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}

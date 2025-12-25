@@ -98,8 +98,15 @@ func (s *UDPServer) handleMessage(data []byte) {
 	}
 
 	// Insert or get domain
-	if _, err := s.db.InsertOrGetDomain(query.Domain, s.cfg.Resolver.MaxResolv); err != nil {
+	domain, err := s.db.InsertOrGetDomain(query.Domain, s.cfg.Resolver.MaxResolv)
+	if err != nil {
 		log.Printf("Error inserting domain: %v", err)
+		return
+	}
+
+	// Update last_seen timestamp to track when domain was last queried
+	if err := s.db.UpdateDomainLastSeen(domain.ID); err != nil {
+		log.Printf("Error updating domain last_seen: %v", err)
 	}
 }
 

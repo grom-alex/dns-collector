@@ -30,10 +30,12 @@ type DatabaseConfig struct {
 }
 
 type ResolverConfig struct {
-	IntervalSeconds int `yaml:"interval_seconds"`
-	MaxResolv       int `yaml:"max_resolv"`
-	TimeoutSeconds  int `yaml:"timeout_seconds"`
-	Workers         int `yaml:"workers"`
+	IntervalSeconds    int  `yaml:"interval_seconds"`
+	MaxResolv          int  `yaml:"max_resolv"`
+	TimeoutSeconds     int  `yaml:"timeout_seconds"`
+	Workers            int  `yaml:"workers"`
+	CyclicResolv       bool `yaml:"cyclic_resolv"`        // Enable cyclic resolution (reset after max_resolv)
+	ResolvCooldownMins int  `yaml:"resolv_cooldown_mins"` // Cooldown between cycles in minutes
 }
 
 type LoggingConfig struct {
@@ -47,6 +49,7 @@ type WebAPIConfig struct {
 type RetentionConfig struct {
 	StatsDays            int `yaml:"stats_days"`
 	CleanupIntervalHours int `yaml:"cleanup_interval_hours"`
+	IPTTLDays            int `yaml:"ip_ttl_days"` // TTL for IP addresses in days
 }
 
 func Load(path string) (*Config, error) {
@@ -99,6 +102,22 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Retention.CleanupIntervalHours > 168 {
 		return nil, fmt.Errorf("retention cleanup_interval_hours must not exceed 168 hours (1 week), got %d", cfg.Retention.CleanupIntervalHours)
+	}
+
+	// Validate IP TTL: 0 means disabled, otherwise must be between 1 and 90 days
+	if cfg.Retention.IPTTLDays < 0 {
+		cfg.Retention.IPTTLDays = 0 // disabled
+	}
+	if cfg.Retention.IPTTLDays == 0 {
+		cfg.Retention.IPTTLDays = 3 // default 3 days
+	}
+	if cfg.Retention.IPTTLDays > 90 {
+		return nil, fmt.Errorf("retention ip_ttl_days must not exceed 90 days, got %d", cfg.Retention.IPTTLDays)
+	}
+
+	// Validate cyclic resolv cooldown
+	if cfg.Resolver.CyclicResolv && cfg.Resolver.ResolvCooldownMins <= 0 {
+		cfg.Resolver.ResolvCooldownMins = 240 // default 4 hours
 	}
 
 	return &cfg, nil

@@ -69,7 +69,10 @@ func (r *Resolver) runResolution() {
 	// Get domains that need to be resolved
 	// We'll process them in batches using worker pool
 	batchSize := r.cfg.Resolver.Workers * 10
-	domains, err := r.db.GetDomainsToResolve(batchSize)
+	cyclicMode := r.cfg.Resolver.CyclicResolv
+	cooldownMins := r.cfg.Resolver.ResolvCooldownMins
+
+	domains, err := r.db.GetDomainsToResolve(batchSize, cyclicMode, cooldownMins)
 	if err != nil {
 		log.Printf("Error getting domains to resolve: %v", err)
 		return
@@ -153,7 +156,8 @@ func (r *Resolver) resolveDomain(domain database.Domain) {
 
 	// Update domain statistics even if resolution failed
 	// This ensures we don't keep trying to resolve non-existent domains
-	if err := r.db.UpdateDomainResolvStats(domain.ID); err != nil {
+	cyclicMode := r.cfg.Resolver.CyclicResolv
+	if err := r.db.UpdateDomainResolvStats(domain.ID, cyclicMode); err != nil {
 		log.Printf("Error updating domain stats for %s: %v", domain.Domain, err)
 	}
 
