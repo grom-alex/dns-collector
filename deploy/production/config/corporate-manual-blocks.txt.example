@@ -1,0 +1,27 @@
+# Corporate Manual Blocklist
+# Manually curated list of IPs to block
+# Format: One IP per line, comments start with #
+
+# Social media platforms (if not caught by domain regex)
+31.13.64.0/24  # Note: CIDR notation NOT supported, use individual IPs
+# 31.13.64.1
+# 31.13.64.2
+# ... expand CIDR manually if needed
+
+# Gaming services
+# Steam CDN IPs that bypass DNS
+104.96.0.1
+104.96.0.2
+
+# Streaming services (corporate policy)
+# Netflix
+45.57.0.1
+45.57.0.2
+
+# Crypto mining pools
+# Block known mining pool IPs
+198.51.100.50
+198.51.100.51
+
+# Add your custom blocks below
+#

@@ -69,3 +69,10 @@ type ExportList struct {
 	IPv4    []string
 	IPv6    []string
 }
+
+// ExcludedIPInfo contains information about IP address excluded from export
+type ExcludedIPInfo struct {
+	IP                string   `json:"ip"`                  // IP address
+	MatchedDomains    []string `json:"matched_domains"`     // Domains matching the regex
+	NonMatchedDomains []string `json:"non_matched_domains"` // Domains NOT matching the regex
+}

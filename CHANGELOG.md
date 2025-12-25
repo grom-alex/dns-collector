@@ -2,7 +2,94 @@
 
 All notable changes to DNS Collector will be documented in this file.
 
-## [2.3.2] - 2025-12-24
+## [2.4.0] - 2025-12-24
+
+### Added
+- **IPv4/IPv6 Filtering for Export Lists**: Selective IP version export for pfSense
+  - `include_ipv4` option: enable/disable IPv4 addresses in export (default: `true`)
+  - `include_ipv6` option: enable/disable IPv6 addresses in export (default: `true`)
+  - Useful for firewalls without IPv6 support or separate IPv4/IPv6 rules
+
+- **Shared IP Exclusion**: Prevent blocking of CDN and cloud services
+  - `exclude_shared_ips` option: exclude IPs used by both matched and non-matched domains (default: `false`)
+  - Protects legitimate services sharing IPs with unwanted domains
+  - Example: Prevents blocking Cloudflare IPs when blocking ads.cloudflare.com
+
+- **Excluded IPs Analysis Endpoint**: Audit and debug IP filtering
+  - `excluded_ips_endpoint` configuration option for separate analysis endpoint
+  - Format: `IP | Matched Domains | Non-Matched Domains`
+  - Helps make informed decisions about blocking shared IPs
+
+- **Additional Static IPs from File**: Extend blocklists with external threat intelligence
+  - `additional_ips_file` option: path to file with static IP addresses
+  - Supports comments (#) and empty lines
+  - Automatic deduplication with database IPs
+  - Applies IPv4/IPv6 filtering
+  - Maximum 100,000 lines per file
+
+### Security
+- Enhanced configuration validation for new optional parameters
+- File path validation (must be absolute and in `/app/config/`)
+- Limit on additional IPs file size (100,000 lines)
+
+### Documentation
+- Updated [`web-api/EXPORT_LISTS.md`](web-api/EXPORT_LISTS.md) with v2.4.0 features
+- Added 5 practical examples covering all new features
+- Added troubleshooting guide
+- Created production config examples in `deploy/production/config/`
+- Added `threat-intel-ips.txt.example` and `corporate-manual-blocks.txt.example`
+- Added `README-additional-ips.md` with usage instructions
+
+### Technical Details
+- New database method: `GetExcludedIPs(domainRegex, includeIPv4, includeIPv6)` with PostgreSQL CTEs
+- New utility package: `internal/utils/ip_parser.go` with file parsing and validation
+- Updated `GetExportList()` with IPv4/IPv6 filtering and shared IP exclusion using CTEs
+- New handler: `ExportExcludedIPs()` for excluded IPs analysis
+- PostgreSQL array parsing helper: `parsePostgreSQLArray()` for ARRAY_AGG results
+- Fixed closure capture bug in export list route registration
+- Comprehensive tests for IP parser (4 test functions)
+- All 88+ tests passing
+
+### Configuration Examples
+
+**IPv4-only export (firewall without IPv6 support):**
+```yaml
+export_lists:
+  - name: "Ad Blocklist IPv4"
+    endpoint: "/export/ads-ipv4"
+    domain_regex: "^(ads|adservice|tracking)\\."
+    include_domains: true
+    include_ipv4: true
+    include_ipv6: false
+```
+
+**Safe blocking with shared IP exclusion:**
+```yaml
+export_lists:
+  - name: "Tracking Blocklist Safe"
+    endpoint: "/export/tracking"
+    excluded_ips_endpoint: "/export/tracking-excluded"
+    domain_regex: "^(tracking|telemetry)\\."
+    include_domains: true
+    exclude_shared_ips: true
+```
+
+**Extended blocklist with threat intelligence:**
+```yaml
+export_lists:
+  - name: "Malware Comprehensive"
+    endpoint: "/export/malware"
+    domain_regex: "\\.(malware|virus|trojan)\\."
+    include_domains: false
+    include_ipv4: true
+    include_ipv6: true
+    exclude_shared_ips: true
+    additional_ips_file: "/app/config/threat-intel-ips.txt"
+```
+
+### Backward Compatibility
+All new parameters are optional with sensible defaults. Existing configurations work without changes.
+
 
 ### Added
 - **Excel Export**: New functionality to export DNS statistics and domains to Excel (XLSX) format

@@ -20,7 +20,8 @@ type MockDatabase struct {
 	GetDomainsFunc        func(filter models.DomainsFilter) ([]models.Domain, int64, error)
 	GetDomainWithIPsFunc  func(id int64) (*models.Domain, error)
 	GetDomainsWithIPsFunc func(filter models.DomainsFilter) ([]models.Domain, int64, error)
-	GetExportListFunc     func(domainRegex string) (*models.ExportList, error)
+	GetExportListFunc     func(domainRegex string, includeIPv4, includeIPv6, excludeSharedIPs bool) (*models.ExportList, error)
+	GetExcludedIPsFunc    func(domainRegex string, includeIPv4, includeIPv6 bool) ([]models.ExcludedIPInfo, error)
 }
 
 func (m *MockDatabase) GetStats(filter models.StatsFilter) ([]models.DomainStat, int64, error) {
@@ -51,11 +52,18 @@ func (m *MockDatabase) GetDomainsWithIPs(filter models.DomainsFilter) ([]models.
 	return nil, 0, nil
 }
 
-func (m *MockDatabase) GetExportList(domainRegex string) (*models.ExportList, error) {
+func (m *MockDatabase) GetExportList(domainRegex string, includeIPv4, includeIPv6, excludeSharedIPs bool) (*models.ExportList, error) {
 	if m.GetExportListFunc != nil {
-		return m.GetExportListFunc(domainRegex)
+		return m.GetExportListFunc(domainRegex, includeIPv4, includeIPv6, excludeSharedIPs)
 	}
 	return &models.ExportList{}, nil
+}
+
+func (m *MockDatabase) GetExcludedIPs(domainRegex string, includeIPv4, includeIPv6 bool) ([]models.ExcludedIPInfo, error) {
+	if m.GetExcludedIPsFunc != nil {
+		return m.GetExcludedIPsFunc(domainRegex, includeIPv4, includeIPv6)
+	}
+	return []models.ExcludedIPInfo{}, nil
 }
 
 func (m *MockDatabase) Close() error {
@@ -457,7 +465,7 @@ func TestGetDomains_DatabaseError(t *testing.T) {
 func TestExportList_Success(t *testing.T) {
 	router, mockDB := setupTestRouter()
 
-	mockDB.GetExportListFunc = func(domainRegex string) (*models.ExportList, error) {
+	mockDB.GetExportListFunc = func(domainRegex string, includeIPv4, includeIPv6, excludeSharedIPs bool) (*models.ExportList, error) {
 		return &models.ExportList{
 			Domains: []string{"example.com.", "test.com."}, // Domains with trailing dots (FQDN format from DB)
 			IPv4:    []string{"192.0.2.1", "192.0.2.2"},
@@ -467,7 +475,7 @@ func TestExportList_Success(t *testing.T) {
 
 	h := NewHandler(mockDB)
 	router.GET("/export/test", func(c *gin.Context) {
-		h.ExportList(c, ".*", true)
+		h.ExportList(c, ".*", true, true, true, false, "")
 	})
 
 	req, _ := http.NewRequest(http.MethodGet, "/export/test", nil)
@@ -493,7 +501,7 @@ func TestExportList_Success(t *testing.T) {
 func TestExportList_IPsOnly(t *testing.T) {
 	router, mockDB := setupTestRouter()
 
-	mockDB.GetExportListFunc = func(domainRegex string) (*models.ExportList, error) {
+	mockDB.GetExportListFunc = func(domainRegex string, includeIPv4, includeIPv6, excludeSharedIPs bool) (*models.ExportList, error) {
 		return &models.ExportList{
 			Domains: []string{"example.com", "test.com"},
 			IPv4:    []string{"192.0.2.1"},
@@ -503,7 +511,7 @@ func TestExportList_IPsOnly(t *testing.T) {
 
 	h := NewHandler(mockDB)
 	router.GET("/export/ips", func(c *gin.Context) {
-		h.ExportList(c, ".*", false) // include_domains = false
+		h.ExportList(c, ".*", false, true, true, false, "") // include_domains = false
 	})
 
 	req, _ := http.NewRequest(http.MethodGet, "/export/ips", nil)
@@ -524,7 +532,7 @@ func TestExportList_IPsOnly(t *testing.T) {
 func TestExportList_EmptyResults(t *testing.T) {
 	router, mockDB := setupTestRouter()
 
-	mockDB.GetExportListFunc = func(domainRegex string) (*models.ExportList, error) {
+	mockDB.GetExportListFunc = func(domainRegex string, includeIPv4, includeIPv6, excludeSharedIPs bool) (*models.ExportList, error) {
 		return &models.ExportList{
 			Domains: []string{},
 			IPv4:    []string{},
@@ -534,7 +542,7 @@ func TestExportList_EmptyResults(t *testing.T) {
 
 	h := NewHandler(mockDB)
 	router.GET("/export/empty", func(c *gin.Context) {
-		h.ExportList(c, "^nomatch$", true)
+		h.ExportList(c, "^nomatch$", true, true, true, false, "")
 	})
 
 	req, _ := http.NewRequest(http.MethodGet, "/export/empty", nil)
@@ -553,13 +561,13 @@ func TestExportList_EmptyResults(t *testing.T) {
 func TestExportList_DatabaseError(t *testing.T) {
 	router, mockDB := setupTestRouter()
 
-	mockDB.GetExportListFunc = func(domainRegex string) (*models.ExportList, error) {
+	mockDB.GetExportListFunc = func(domainRegex string, includeIPv4, includeIPv6, excludeSharedIPs bool) (*models.ExportList, error) {
 		return nil, errors.New("database connection failed")
 	}
 
 	h := NewHandler(mockDB)
 	router.GET("/export/error", func(c *gin.Context) {
-		h.ExportList(c, ".*", true)
+		h.ExportList(c, ".*", true, true, true, false, "")
 	})
 
 	req, _ := http.NewRequest(http.MethodGet, "/export/error", nil)
@@ -574,7 +582,7 @@ func TestExportList_DatabaseError(t *testing.T) {
 func TestExportList_OnlyIPv4(t *testing.T) {
 	router, mockDB := setupTestRouter()
 
-	mockDB.GetExportListFunc = func(domainRegex string) (*models.ExportList, error) {
+	mockDB.GetExportListFunc = func(domainRegex string, includeIPv4, includeIPv6, excludeSharedIPs bool) (*models.ExportList, error) {
 		return &models.ExportList{
 			Domains: []string{},
 			IPv4:    []string{"192.0.2.1", "192.0.2.2"},
@@ -584,7 +592,7 @@ func TestExportList_OnlyIPv4(t *testing.T) {
 
 	h := NewHandler(mockDB)
 	router.GET("/export/ipv4", func(c *gin.Context) {
-		h.ExportList(c, ".*", false)
+		h.ExportList(c, ".*", false, true, true, false, "")
 	})
 
 	req, _ := http.NewRequest(http.MethodGet, "/export/ipv4", nil)
@@ -604,7 +612,7 @@ func TestExportList_OnlyIPv4(t *testing.T) {
 func TestExportList_RemoveTrailingDot(t *testing.T) {
 	router, mockDB := setupTestRouter()
 
-	mockDB.GetExportListFunc = func(domainRegex string) (*models.ExportList, error) {
+	mockDB.GetExportListFunc = func(domainRegex string, includeIPv4, includeIPv6, excludeSharedIPs bool) (*models.ExportList, error) {
 		return &models.ExportList{
 			// Domains in FQDN format with trailing dots (as stored in DB)
 			Domains: []string{
@@ -619,7 +627,7 @@ func TestExportList_RemoveTrailingDot(t *testing.T) {
 
 	h := NewHandler(mockDB)
 	router.GET("/export/trailing", func(c *gin.Context) {
-		h.ExportList(c, ".*", true)
+		h.ExportList(c, ".*", true, true, true, false, "")
 	})
 
 	req, _ := http.NewRequest(http.MethodGet, "/export/trailing", nil)

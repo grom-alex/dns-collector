@@ -7,7 +7,7 @@ import (
 func TestGetExportList_ValidateEmptyRegex(t *testing.T) {
 	db := &Database{}
 
-	_, err := db.GetExportList("")
+	_, err := db.GetExportList("", true, true, false)
 	if err == nil {
 		t.Error("Expected error for empty regex, got nil")
 	}
@@ -26,7 +26,7 @@ func TestGetExportList_ValidateRegexTooLong(t *testing.T) {
 		longRegex += "a"
 	}
 
-	_, err := db.GetExportList(longRegex)
+	_, err := db.GetExportList(longRegex, true, true, false)
 	if err == nil {
 		t.Error("Expected error for regex too long, got nil")
 	}
@@ -40,7 +40,7 @@ func TestGetExportList_ValidateRegexTooLong(t *testing.T) {
 func TestGetExportList_DangerousPattern_NestedStar(t *testing.T) {
 	db := &Database{}
 
-	_, err := db.GetExportList("(.*)*")
+	_, err := db.GetExportList("(.*)*", true, true, false)
 	if err == nil {
 		t.Error("Expected error for dangerous pattern (.*)*,  got nil")
 	}
@@ -53,7 +53,7 @@ func TestGetExportList_DangerousPattern_NestedStar(t *testing.T) {
 func TestGetExportList_DangerousPattern_NestedPlus1(t *testing.T) {
 	db := &Database{}
 
-	_, err := db.GetExportList("(.+)+")
+	_, err := db.GetExportList("(.+)+", true, true, false)
 	if err == nil {
 		t.Error("Expected error for dangerous pattern (.+)+, got nil")
 	}
@@ -66,7 +66,7 @@ func TestGetExportList_DangerousPattern_NestedPlus1(t *testing.T) {
 func TestGetExportList_DangerousPattern_NestedPlus2(t *testing.T) {
 	db := &Database{}
 
-	_, err := db.GetExportList("(.*)+")
+	_, err := db.GetExportList("(.*)+", true, true, false)
 	if err == nil {
 		t.Error("Expected error for dangerous pattern (.*)+ , got nil")
 	}
@@ -79,7 +79,7 @@ func TestGetExportList_DangerousPattern_NestedPlus2(t *testing.T) {
 func TestGetExportList_DangerousPattern_NestedStar2(t *testing.T) {
 	db := &Database{}
 
-	_, err := db.GetExportList("(.+)*")
+	_, err := db.GetExportList("(.+)*", true, true, false)
 	if err == nil {
 		t.Error("Expected error for dangerous pattern (.+)*, got nil")
 	}

@@ -14,6 +14,7 @@ import (
 	"dns-collector-webapi/internal/database"
 	"dns-collector-webapi/internal/excel"
 	"dns-collector-webapi/internal/models"
+	"dns-collector-webapi/internal/utils"
 )
 
 type Handler struct {
@@ -181,13 +182,31 @@ func (h *Handler) HealthCheck(c *gin.Context) {
 }
 
 // ExportList handles export list endpoints
-func (h *Handler) ExportList(c *gin.Context, domainRegex string, includeDomains bool) {
+func (h *Handler) ExportList(c *gin.Context, domainRegex string, includeDomains bool, includeIPv4, includeIPv6, excludeSharedIPs bool, additionalIPsFile string) {
 	// Get data from database
-	exportList, err := h.db.GetExportList(domainRegex)
+	exportList, err := h.db.GetExportList(domainRegex, includeIPv4, includeIPv6, excludeSharedIPs)
 	if err != nil {
 		log.Printf("Error getting export list: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+
+	// Load additional IPs from file if specified
+	if additionalIPsFile != "" {
+		additionalIPv4, additionalIPv6, err := utils.ParseIPsFromFile(additionalIPsFile)
+		if err != nil {
+			log.Printf("Warning: failed to load additional IPs from %s: %v", additionalIPsFile, err)
+			// Continue anyway - this is not a critical error
+		} else {
+			// Append additional IPs to export list
+			if includeIPv4 {
+				exportList.IPv4 = append(exportList.IPv4, additionalIPv4...)
+			}
+			if includeIPv6 {
+				exportList.IPv6 = append(exportList.IPv6, additionalIPv6...)
+			}
+			log.Printf("Loaded %d IPv4 and %d IPv6 addresses from %s", len(additionalIPv4), len(additionalIPv6), additionalIPsFile)
+		}
 	}
 
 	// Log if export list is empty (useful for debugging)
@@ -217,6 +236,43 @@ func (h *Handler) ExportList(c *gin.Context, domainRegex string, includeDomains 
 	// Add IPv6 addresses
 	for _, ip := range exportList.IPv6 {
 		result.WriteString(ip)
+		result.WriteString("\n")
+	}
+
+	// Return as plain text with caching headers
+	c.Header("Content-Type", "text/plain; charset=utf-8")
+	c.Header("Cache-Control", "public, max-age=300") // 5 minutes cache
+	c.String(http.StatusOK, result.String())
+}
+
+// ExportExcludedIPs handles export excluded IPs endpoints
+func (h *Handler) ExportExcludedIPs(c *gin.Context, domainRegex string, includeIPv4, includeIPv6 bool) {
+	// Get excluded IPs from database
+	excludedIPs, err := h.db.GetExcludedIPs(domainRegex, includeIPv4, includeIPv6)
+	if err != nil {
+		log.Printf("Error getting excluded IPs: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Log if result is empty
+	if len(excludedIPs) == 0 {
+		log.Printf("No excluded IPs found for regex: %s", domainRegex)
+	}
+
+	// Build plain text response in format:
+	// IP | Matched Domains | Non-Matched Domains
+	var result strings.Builder
+	result.WriteString("# Excluded IPs (shared between matched and non-matched domains)\n")
+	result.WriteString("# Format: IP | Matched Domains | Non-Matched Domains\n")
+	result.WriteString("#\n")
+
+	for _, info := range excludedIPs {
+		result.WriteString(info.IP)
+		result.WriteString(" | ")
+		result.WriteString(strings.Join(info.MatchedDomains, ", "))
+		result.WriteString(" | ")
+		result.WriteString(strings.Join(info.NonMatchedDomains, ", "))
 		result.WriteString("\n")
 	}
 

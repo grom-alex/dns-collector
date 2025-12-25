@@ -1,0 +1,31 @@
+# Threat Intelligence IP Blocklist
+# Format: One IP per line, comments start with #
+# Update regularly from your threat intelligence feeds
+#
+# Last updated: 2025-12-24
+
+# Known malware C&C servers
+# Source: Example Threat Feed
+198.51.100.10
+198.51.100.11
+203.0.113.50
+203.0.113.51
+
+# Botnet infrastructure
+# Source: Internal security team
+192.0.2.100
+192.0.2.101
+192.0.2.102
+
+# Phishing servers
+# Source: Anti-phishing coalition
+198.51.100.20
+198.51.100.21
+
+# IPv6 malware infrastructure
+2001:db8:bad::1
+2001:db8:bad::2
+2001:db8:bad::10
+
+# Add your custom IPs below
+# 
