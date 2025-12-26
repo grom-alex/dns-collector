@@ -24,3 +24,16 @@ retention:
   stats_days: 30  # Keep statistics for 30 days (1 month)
   cleanup_interval_hours: 24  # Run cleanup every 24 hours (once per day)
   ip_ttl_days: 3  # IP addresses TTL (3 days) - only active domains have old IPs cleaned
+
+metrics:
+  enabled: true
+  port: 9090
+  path: "/metrics"
+  influxdb:
+    enabled: false
+    url: "https://influxdb:8086"
+    token: ""  # Set via INFLUXDB_TOKEN env var
+    organization: "my-org"
+    bucket: "dns-metrics"
+    interval_seconds: 10
+    insecure_skip_verify: false  # Set to true for self-signed certificates

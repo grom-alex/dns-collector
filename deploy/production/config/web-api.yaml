@@ -19,6 +19,18 @@ cors:
     - "https://www.your-domain.com"
   allow_credentials: true
 
+metrics:
+  enabled: true
+  path: "/metrics"
+  influxdb:
+    enabled: false
+    url: "https://influxdb:8086"
+    token: ""  # Set via INFLUXDB_TOKEN environment variable
+    organization: "my-org"
+    bucket: "dns-metrics"
+    interval_seconds: 10
+    insecure_skip_verify: false  # Set to true for self-signed certificates
+
 # Export lists for pfSense firewall alias tables
 # Configure domain filters and endpoints for IP/domain exports
 # New in v2.4.0: IPv4/IPv6 filtering, shared IP exclusion, additional static IPs

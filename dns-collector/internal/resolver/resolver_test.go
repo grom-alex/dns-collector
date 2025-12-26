@@ -120,7 +120,7 @@ func TestResolveCNAME(t *testing.T) {
 		},
 	}
 
-	resolver := NewResolver(cfg, nil)
+	resolver := NewResolver(cfg, nil, nil)
 	if resolver.dnsConf == nil {
 		t.Fatal("Expected dnsConf to be initialized")
 	}
@@ -215,7 +215,7 @@ func TestDNSResolver_PreferGo(t *testing.T) {
 		},
 	}
 
-	resolver := NewResolver(cfg, nil)
+	resolver := NewResolver(cfg, nil, nil)
 
 	if !resolver.dnsConf.PreferGo {
 		t.Error("Expected PreferGo to be true")

@@ -15,7 +15,7 @@ func TestNewService(t *testing.T) {
 		},
 	}
 
-	service := NewService(cfg, nil)
+	service := NewService(cfg, nil, nil)
 
 	if service.retentionDays != 30 {
 		t.Errorf("Expected retentionDays=30, got %d", service.retentionDays)
@@ -46,7 +46,7 @@ func TestServiceRetentionPeriod(t *testing.T) {
 				},
 			}
 
-			service := NewService(cfg, nil)
+			service := NewService(cfg, nil, nil)
 
 			if service.retentionDays != tt.retentionDays {
 				t.Errorf("Expected retentionDays=%d, got %d", tt.retentionDays, service.retentionDays)
@@ -63,7 +63,7 @@ func TestServiceChannels(t *testing.T) {
 		},
 	}
 
-	service := NewService(cfg, nil)
+	service := NewService(cfg, nil, nil)
 
 	// Test that channels are created
 	if service.stopChan == nil {
@@ -107,7 +107,7 @@ func TestCleanupInterval(t *testing.T) {
 				},
 			}
 
-			service := NewService(cfg, nil)
+			service := NewService(cfg, nil, nil)
 
 			if service.cleanupInterval != tt.expected {
 				t.Errorf("Expected cleanup interval=%v, got %v", tt.expected, service.cleanupInterval)

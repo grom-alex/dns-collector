@@ -14,6 +14,7 @@ type Config struct {
 	Logging   LoggingConfig   `yaml:"logging"`
 	WebAPI    WebAPIConfig    `yaml:"webapi"`
 	Retention RetentionConfig `yaml:"retention"`
+	Metrics   MetricsConfig   `yaml:"metrics"`
 }
 
 type ServerConfig struct {
@@ -50,6 +51,23 @@ type RetentionConfig struct {
 	StatsDays            int `yaml:"stats_days"`
 	CleanupIntervalHours int `yaml:"cleanup_interval_hours"`
 	IPTTLDays            int `yaml:"ip_ttl_days"` // TTL for IP addresses in days
+}
+
+type MetricsConfig struct {
+	Enabled  bool           `yaml:"enabled"`
+	Port     int            `yaml:"port"`
+	Path     string         `yaml:"path"`
+	InfluxDB InfluxDBConfig `yaml:"influxdb"`
+}
+
+type InfluxDBConfig struct {
+	Enabled            bool   `yaml:"enabled"`
+	URL                string `yaml:"url"`
+	Token              string `yaml:"token"`
+	Organization       string `yaml:"organization"`
+	Bucket             string `yaml:"bucket"`
+	IntervalSeconds    int    `yaml:"interval_seconds"`
+	InsecureSkipVerify bool   `yaml:"insecure_skip_verify"`
 }
 
 func Load(path string) (*Config, error) {
@@ -118,6 +136,22 @@ func Load(path string) (*Config, error) {
 	// Validate cyclic resolv cooldown
 	if cfg.Resolver.CyclicResolv && cfg.Resolver.ResolvCooldownMins <= 0 {
 		cfg.Resolver.ResolvCooldownMins = 240 // default 4 hours
+	}
+
+	// Set defaults for metrics configuration
+	if cfg.Metrics.Port <= 0 || cfg.Metrics.Port > 65535 {
+		cfg.Metrics.Port = 9090 // default metrics port
+	}
+	if cfg.Metrics.Path == "" {
+		cfg.Metrics.Path = "/metrics"
+	}
+	if cfg.Metrics.InfluxDB.IntervalSeconds <= 0 {
+		cfg.Metrics.InfluxDB.IntervalSeconds = 10 // default push interval
+	}
+
+	// Override InfluxDB token from environment variable if set
+	if envToken := os.Getenv("INFLUXDB_TOKEN"); envToken != "" {
+		cfg.Metrics.InfluxDB.Token = envToken
 	}
 
 	return &cfg, nil

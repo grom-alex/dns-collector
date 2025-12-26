@@ -2,6 +2,49 @@
 
 All notable changes to DNS Collector will be documented in this file.
 
+## [2.6.0] - 2025-12-26
+
+### Added
+- **Prometheus Metrics**: Comprehensive metrics collection for both services
+  - dns-collector: resolver, UDP server, cleanup, and database metrics
+  - web-api: HTTP request metrics via Gin middleware, API metrics
+  - Go runtime metrics (goroutines, memory, GC)
+  - Separate `/metrics` endpoint on port 9090 (dns-collector) and 8080 (web-api)
+
+- **InfluxDB2 Push Support**: Optional time-series metrics storage
+  - Periodic push to InfluxDB2 with configurable interval
+  - TLS support with `insecure_skip_verify` option for self-signed certificates
+  - Token authentication via config or `INFLUXDB_TOKEN` environment variable
+
+### Configuration
+- New `metrics` section in configuration files:
+  ```yaml
+  metrics:
+    enabled: true
+    port: 9090
+    path: "/metrics"
+    influxdb:
+      enabled: false
+      url: "https://influxdb:8086"
+      token: ""
+      organization: "my-org"
+      bucket: "dns-metrics"
+      interval_seconds: 10
+      insecure_skip_verify: false
+  ```
+
+### Documentation
+- Added [`METRICS.md`](METRICS.md) with complete metrics reference
+- Prometheus scrape configuration examples
+- Grafana dashboard query examples
+
+### Technical Details
+- New package: `internal/metrics/` in both services
+- Prometheus client: `github.com/prometheus/client_golang v1.20.5`
+- InfluxDB client: `github.com/influxdata/influxdb-client-go/v2 v2.14.0`
+- Custom HTTP client with TLS configuration for InfluxDB
+- Gin middleware for automatic HTTP metrics collection
+
 ## [2.4.0] - 2025-12-24
 
 ### Added

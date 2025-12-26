@@ -14,6 +14,8 @@ resolver:
   max_resolv: 3        # Fewer resolves for testing
   timeout_seconds: 5
   workers: 2           # Fewer workers for development
+  cyclic_resolv: true  # Enable cyclic resolution
+  resolv_cooldown_mins: 60  # Shorter cooldown for dev (1 hour)
 
 logging:
   level: "debug"       # Debug mode for development
@@ -21,3 +23,17 @@ logging:
 retention:
   stats_days: 7        # Keep statistics for 7 days in development
   cleanup_interval_hours: 12  # More frequent cleanup in development (every 12 hours)
+  ip_ttl_days: 1       # Shorter IP TTL for development (1 day)
+
+metrics:
+  enabled: true
+  port: 9090
+  path: "/metrics"
+  influxdb:
+    enabled: false
+    url: "https://localhost:8086"
+    token: ""
+    organization: "dev-org"
+    bucket: "dns-metrics-dev"
+    interval_seconds: 5
+    insecure_skip_verify: true  # Dev environment with self-signed cert

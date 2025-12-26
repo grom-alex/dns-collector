@@ -25,11 +25,14 @@ func TestInsertOrGetDomain_NewDomain(t *testing.T) {
 		WithArgs("example.com", sqlmock.AnyArg(), 10, sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnRows(rows)
 
-	domain, err := database.InsertOrGetDomain("example.com", 10)
+	domain, isNew, err := database.InsertOrGetDomain("example.com", 10)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
+	if !isNew {
+		t.Error("Expected isNew=true for new domain")
+	}
 	if domain.ID != 1 {
 		t.Errorf("Expected ID=1, got %d", domain.ID)
 	}
@@ -68,11 +71,14 @@ func TestInsertOrGetDomain_ExistingDomain(t *testing.T) {
 		WithArgs("example.com").
 		WillReturnRows(rows)
 
-	domain, err := database.InsertOrGetDomain("example.com", 10)
+	domain, isNew, err := database.InsertOrGetDomain("example.com", 10)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
+	if isNew {
+		t.Error("Expected isNew=false for existing domain")
+	}
 	if domain.ID != 1 {
 		t.Errorf("Expected ID=1, got %d", domain.ID)
 	}
