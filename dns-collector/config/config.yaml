@@ -14,6 +14,8 @@ resolver:
   max_resolv: 10  # Default max_resolv value for new domains
   timeout_seconds: 5  # DNS query timeout
   workers: 5  # Number of concurrent resolver workers
+  cyclic_resolv: true  # Enable cyclic resolution (reset after max_resolv)
+  resolv_cooldown_mins: 240  # Cooldown between cycles (4 hours)
 
 logging:
   level: "info"  # debug, info, warn, error
@@ -21,3 +23,4 @@ logging:
 retention:
   stats_days: 30  # Keep statistics for 30 days (1 month)
   cleanup_interval_hours: 24  # Run cleanup every 24 hours (once per day)
+  ip_ttl_days: 3  # IP addresses TTL (3 days) - only active domains have old IPs cleaned

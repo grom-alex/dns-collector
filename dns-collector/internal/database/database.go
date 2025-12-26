@@ -29,6 +29,7 @@ type Domain struct {
 	ResolvCount    int
 	MaxResolv      int
 	LastResolvTime time.Time
+	LastSeen       *time.Time // When domain was last queried by client (can be NULL)
 }
 
 type IPAddress struct {
@@ -98,9 +99,11 @@ func (db *Database) initSchema() error {
 		time_insert TIMESTAMP NOT NULL,
 		resolv_count INTEGER NOT NULL DEFAULT 0,
 		max_resolv INTEGER NOT NULL,
-		last_resolv_time TIMESTAMP NOT NULL
+		last_resolv_time TIMESTAMP NOT NULL,
+		last_seen TIMESTAMP
 	);
 	CREATE INDEX IF NOT EXISTS idx_domain_resolv ON domain(resolv_count, max_resolv);
+	CREATE INDEX IF NOT EXISTS idx_domain_last_seen ON domain(last_seen);
 	`
 
 	if _, err := db.DB.Exec(domainSchema); err != nil {
@@ -119,6 +122,7 @@ func (db *Database) initSchema() error {
 		FOREIGN KEY(domain_id) REFERENCES domain(id) ON DELETE CASCADE
 	);
 	CREATE INDEX IF NOT EXISTS idx_ip_domain ON ip(domain_id);
+	CREATE INDEX IF NOT EXISTS idx_ip_time_cleanup ON ip(time);
 	`
 
 	if _, err := db.DB.Exec(ipSchema); err != nil {
@@ -160,20 +164,20 @@ func (db *Database) InsertOrGetDomain(domain string, maxResolv int) (*Domain, er
 	// Use INSERT ... ON CONFLICT for upsert
 	var d Domain
 	err := db.DB.QueryRow(
-		`INSERT INTO domain (domain, time_insert, resolv_count, max_resolv, last_resolv_time)
-		VALUES ($1, $2, 0, $3, $4)
+		`INSERT INTO domain (domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen)
+		VALUES ($1, $2, 0, $3, $4, $5)
 		ON CONFLICT (domain) DO NOTHING
-		RETURNING id, domain, time_insert, resolv_count, max_resolv, last_resolv_time`,
-		domain, now, maxResolv, now,
-	).Scan(&d.ID, &d.Domain, &d.TimeInsert, &d.ResolvCount, &d.MaxResolv, &d.LastResolvTime)
+		RETURNING id, domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen`,
+		domain, now, maxResolv, now, now,
+	).Scan(&d.ID, &d.Domain, &d.TimeInsert, &d.ResolvCount, &d.MaxResolv, &d.LastResolvTime, &d.LastSeen)
 
 	if err == sql.ErrNoRows {
 		// Domain already exists, fetch it
 		err = db.DB.QueryRow(
-			`SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time
+			`SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen
 			FROM domain WHERE domain = $1`,
 			domain,
-		).Scan(&d.ID, &d.Domain, &d.TimeInsert, &d.ResolvCount, &d.MaxResolv, &d.LastResolvTime)
+		).Scan(&d.ID, &d.Domain, &d.TimeInsert, &d.ResolvCount, &d.MaxResolv, &d.LastResolvTime, &d.LastSeen)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get existing domain: %w", err)
 		}
@@ -185,15 +189,34 @@ func (db *Database) InsertOrGetDomain(domain string, maxResolv int) (*Domain, er
 }
 
 // GetDomainsToResolve returns domains that need to be resolved
-func (db *Database) GetDomainsToResolve(limit int) ([]Domain, error) {
-	rows, err := db.DB.Query(
-		`SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time
-		FROM domain
-		WHERE resolv_count < max_resolv
-		ORDER BY last_resolv_time ASC
-		LIMIT $1`,
-		limit,
-	)
+// In cyclic mode, domains that completed a cycle and cooldown has passed will be included
+func (db *Database) GetDomainsToResolve(limit int, cyclicMode bool, cooldownMins int) ([]Domain, error) {
+	var query string
+	var args []interface{}
+
+	if cyclicMode {
+		// Cyclic mode: include domains that:
+		// 1. Still in current cycle (resolv_count < max_resolv), OR
+		// 2. Completed a cycle AND cooldown period has passed
+		cooldownTime := time.Now().Add(-time.Duration(cooldownMins) * time.Minute)
+		query = `SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen
+			FROM domain
+			WHERE resolv_count < max_resolv
+			   OR (resolv_count >= max_resolv AND last_resolv_time < $1)
+			ORDER BY last_resolv_time ASC
+			LIMIT $2`
+		args = []interface{}{cooldownTime, limit}
+	} else {
+		// Legacy mode: only domains that haven't reached max_resolv
+		query = `SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen
+			FROM domain
+			WHERE resolv_count < max_resolv
+			ORDER BY last_resolv_time ASC
+			LIMIT $1`
+		args = []interface{}{limit}
+	}
+
+	rows, err := db.DB.Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query domains: %w", err)
 	}
@@ -202,7 +225,7 @@ func (db *Database) GetDomainsToResolve(limit int) ([]Domain, error) {
 	var domains []Domain
 	for rows.Next() {
 		var d Domain
-		if err := rows.Scan(&d.ID, &d.Domain, &d.TimeInsert, &d.ResolvCount, &d.MaxResolv, &d.LastResolvTime); err != nil {
+		if err := rows.Scan(&d.ID, &d.Domain, &d.TimeInsert, &d.ResolvCount, &d.MaxResolv, &d.LastResolvTime, &d.LastSeen); err != nil {
 			return nil, fmt.Errorf("failed to scan domain: %w", err)
 		}
 		domains = append(domains, d)
@@ -231,16 +254,30 @@ func (db *Database) InsertOrUpdateIP(domainID int64, ip, ipType string) error {
 }
 
 // UpdateDomainResolvStats updates resolv_count and last_resolv_time
-func (db *Database) UpdateDomainResolvStats(domainID int64) error {
+// In cyclic mode, resets resolv_count to 0 when it reaches max_resolv
+func (db *Database) UpdateDomainResolvStats(domainID int64, cyclicMode bool) error {
 	now := time.Now()
 
-	_, err := db.DB.Exec(
-		`UPDATE domain
-		SET resolv_count = resolv_count + 1,
-		    last_resolv_time = $1
-		WHERE id = $2`,
-		now, domainID,
-	)
+	var query string
+	if cyclicMode {
+		// Reset resolv_count to 0 when it reaches max_resolv - 1
+		// This allows the next cycle to start fresh
+		query = `UPDATE domain
+			SET resolv_count = CASE
+				WHEN resolv_count >= max_resolv - 1 THEN 0
+				ELSE resolv_count + 1
+			END,
+			last_resolv_time = $1
+			WHERE id = $2`
+	} else {
+		// Legacy mode: just increment
+		query = `UPDATE domain
+			SET resolv_count = resolv_count + 1,
+			    last_resolv_time = $1
+			WHERE id = $2`
+	}
+
+	_, err := db.DB.Exec(query, now, domainID)
 	if err != nil {
 		return fmt.Errorf("failed to update domain stats: %w", err)
 	}
@@ -274,6 +311,55 @@ func (db *Database) DeleteOldStats(retentionDays int) (int64, error) {
 	)
 	if err != nil {
 		return 0, fmt.Errorf("failed to delete old stats: %w", err)
+	}
+
+	deleted, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	return deleted, nil
+}
+
+// UpdateDomainLastSeen updates the last_seen timestamp for a domain
+// Called when a DNS query is received for the domain
+func (db *Database) UpdateDomainLastSeen(domainID int64) error {
+	now := time.Now()
+
+	_, err := db.DB.Exec(
+		`UPDATE domain SET last_seen = $1 WHERE id = $2`,
+		now, domainID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update domain last_seen: %w", err)
+	}
+
+	return nil
+}
+
+// DeleteExpiredIPs deletes IP addresses older than the specified TTL
+// Only deletes IPs for domains that are still being queried (last_seen >= cutoff)
+// IPs of inactive domains are preserved
+func (db *Database) DeleteExpiredIPs(ttlDays int) (int64, error) {
+	if ttlDays <= 0 {
+		return 0, nil // TTL disabled
+	}
+
+	cutoffTime := time.Now().AddDate(0, 0, -ttlDays)
+
+	// Delete old IPs only for active domains (domains that have been queried recently)
+	// This protects IPs of domains that are no longer being queried
+	result, err := db.DB.Exec(
+		`DELETE FROM ip
+		WHERE time < $1
+		AND domain_id IN (
+			SELECT id FROM domain
+			WHERE last_seen >= $1
+		)`,
+		cutoffTime,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("failed to delete expired IPs: %w", err)
 	}
 
 	deleted, err := result.RowsAffected()

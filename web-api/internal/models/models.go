@@ -19,6 +19,7 @@ type Domain struct {
 	ResolvCount    int       `json:"resolv_count"`
 	MaxResolv      int       `json:"max_resolv"`
 	LastResolvTime time.Time `json:"last_resolv_time"`
+	LastSeen       time.Time `json:"last_seen"`
 	IPs            []IP      `json:"ips,omitempty"`
 }
 
