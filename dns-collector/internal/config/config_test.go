@@ -501,3 +501,61 @@ server:
 		t.Error("Expected error for invalid YAML, got nil")
 	}
 }
+
+func TestLoad_DomainTTLValidation(t *testing.T) {
+	tests := []struct {
+		name          string
+		domainTTLDays string
+		expectError   bool
+		expectedValue int
+	}{
+		{"valid 30 days", "30", false, 30},
+		{"valid 365 days", "365", false, 365},
+		{"invalid exceeds max", "400", true, 0},
+		{"valid 1 day", "1", false, 1},
+		{"disabled on zero", "0", false, 0},
+		{"disabled on negative", "-5", false, 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			configPath := filepath.Join(tmpDir, "config.yaml")
+
+			configContent := `server:
+  udp_port: 5353
+database:
+  host: "localhost"
+  port: 5432
+  user: "test"
+  password: "test"
+  database: "test"
+  ssl_mode: "disable"
+resolver:
+  interval_seconds: 10
+  max_resolv: 5
+  timeout_seconds: 5
+logging:
+  level: "info"
+retention:
+  stats_days: 30
+  domain_ttl_days: ` + tt.domainTTLDays + `
+`
+
+			if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+				t.Fatalf("Failed to create test config: %v", err)
+			}
+
+			cfg, err := Load(configPath)
+			if tt.expectError && err == nil {
+				t.Error("Expected error but got nil")
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("Expected no error but got: %v", err)
+			}
+			if !tt.expectError && cfg.Retention.DomainTTLDays != tt.expectedValue {
+				t.Errorf("Expected DomainTTLDays=%d, got %d", tt.expectedValue, cfg.Retention.DomainTTLDays)
+			}
+		})
+	}
+}

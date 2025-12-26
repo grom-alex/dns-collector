@@ -14,6 +14,7 @@ type Service struct {
 	metrics         *metrics.Registry
 	retentionDays   int
 	ipTTLDays       int
+	domainTTLDays   int
 	cleanupInterval time.Duration
 	stopChan        chan struct{}
 	doneChan        chan struct{}
@@ -25,6 +26,7 @@ func NewService(cfg *config.Config, db *database.Database, m *metrics.Registry) 
 		metrics:         m,
 		retentionDays:   cfg.Retention.StatsDays,
 		ipTTLDays:       cfg.Retention.IPTTLDays,
+		domainTTLDays:   cfg.Retention.DomainTTLDays,
 		cleanupInterval: time.Duration(cfg.Retention.CleanupIntervalHours) * time.Hour,
 		stopChan:        make(chan struct{}),
 		doneChan:        make(chan struct{}),
@@ -32,7 +34,7 @@ func NewService(cfg *config.Config, db *database.Database, m *metrics.Registry) 
 }
 
 func (s *Service) Start() {
-	log.Printf("Starting cleanup service (stats retention: %d days, IP TTL: %d days)", s.retentionDays, s.ipTTLDays)
+	log.Printf("Starting cleanup service (stats retention: %d days, IP TTL: %d days, domain TTL: %d days)", s.retentionDays, s.ipTTLDays, s.domainTTLDays)
 
 	// Run cleanup immediately on startup
 	s.cleanup()
@@ -65,7 +67,7 @@ func (s *Service) run() {
 
 func (s *Service) cleanup() {
 	start := time.Now()
-	log.Printf("Running cleanup (stats: %d days, IP TTL: %d days)...", s.retentionDays, s.ipTTLDays)
+	log.Printf("Running cleanup (stats: %d days, IP TTL: %d days, domain TTL: %d days)...", s.retentionDays, s.ipTTLDays, s.domainTTLDays)
 
 	// Record cleanup run
 	s.recordMetric(func(m *metrics.Registry) {
@@ -97,6 +99,22 @@ func (s *Service) cleanup() {
 		// Record IP cleanup metrics
 		s.recordMetric(func(m *metrics.Registry) {
 			m.CleanupIPsDeleted.Add(float64(ipsDeleted))
+		})
+	}
+
+	// 3. Cleanup old domains (and their associated IPs)
+	if s.domainTTLDays > 0 {
+		domainsDeleted, domainIPsDeleted, err := s.db.DeleteOldDomains(s.domainTTLDays)
+		if err != nil {
+			log.Printf("Error during domain cleanup: %v", err)
+		} else if domainsDeleted > 0 {
+			log.Printf("Domain cleanup: deleted %d domains and %d associated IPs", domainsDeleted, domainIPsDeleted)
+		}
+
+		// Record domain cleanup metrics
+		s.recordMetric(func(m *metrics.Registry) {
+			m.CleanupDomainsDeleted.Add(float64(domainsDeleted))
+			m.CleanupDomainIPsDeleted.Add(float64(domainIPsDeleted))
 		})
 	}
 

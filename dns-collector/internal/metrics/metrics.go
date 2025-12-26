@@ -23,10 +23,12 @@ type Registry struct {
 	ServerProcessingTime   prometheus.Histogram
 
 	// Cleanup metrics
-	CleanupStatsDeleted prometheus.Counter
-	CleanupIPsDeleted   prometheus.Counter
-	CleanupDuration     prometheus.Histogram
-	CleanupRuns         prometheus.Counter
+	CleanupStatsDeleted     prometheus.Counter
+	CleanupIPsDeleted       prometheus.Counter
+	CleanupDomainsDeleted   prometheus.Counter
+	CleanupDomainIPsDeleted prometheus.Counter
+	CleanupDuration         prometheus.Histogram
+	CleanupRuns             prometheus.Counter
 
 	// Database metrics
 	DBDomainsTotal prometheus.Gauge
@@ -122,6 +124,18 @@ func NewRegistry() *Registry {
 				Help: "Total number of expired IP addresses deleted",
 			},
 		),
+		CleanupDomainsDeleted: prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "dns_cleanup_domains_deleted_total",
+				Help: "Total number of old domains deleted",
+			},
+		),
+		CleanupDomainIPsDeleted: prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "dns_cleanup_domain_ips_deleted_total",
+				Help: "Total number of IP addresses deleted with old domains",
+			},
+		),
 		CleanupDuration: prometheus.NewHistogram(
 			prometheus.HistogramOpts{
 				Name:    "dns_cleanup_duration_seconds",
@@ -164,6 +178,8 @@ func NewRegistry() *Registry {
 		r.ServerProcessingTime,
 		r.CleanupStatsDeleted,
 		r.CleanupIPsDeleted,
+		r.CleanupDomainsDeleted,
+		r.CleanupDomainIPsDeleted,
 		r.CleanupDuration,
 		r.CleanupRuns,
 		r.DBDomainsTotal,
