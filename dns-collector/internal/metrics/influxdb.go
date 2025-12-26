@@ -24,6 +24,7 @@ type InfluxDBClient struct {
 	writeAPI api.WriteAPIBlocking
 	stopCh   chan struct{}
 	doneCh   chan struct{}
+	started  bool
 }
 
 // NewInfluxDBClient creates a new InfluxDB client for pushing metrics.
@@ -70,6 +71,7 @@ func (c *InfluxDBClient) Start() error {
 	log.Printf("InfluxDB client connected to %s (org: %s, bucket: %s)",
 		c.cfg.URL, c.cfg.Organization, c.cfg.Bucket)
 
+	c.started = true
 	go c.pushLoop()
 	return nil
 }
@@ -77,8 +79,13 @@ func (c *InfluxDBClient) Start() error {
 // Stop stops the InfluxDB client.
 func (c *InfluxDBClient) Stop() error {
 	log.Println("Stopping InfluxDB client...")
-	close(c.stopCh)
-	<-c.doneCh
+
+	// Only wait for doneCh if Start() was called
+	if c.started {
+		close(c.stopCh)
+		<-c.doneCh
+	}
+
 	c.client.Close()
 	log.Println("InfluxDB client stopped")
 	return nil
