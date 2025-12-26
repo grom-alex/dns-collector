@@ -85,6 +85,11 @@ func main() {
 			}
 		}
 
+		// Start DB metrics collector (updates domain/IP counts every 30 seconds)
+		dbCollector := metrics.NewDBCollector(db, metricsRegistry, 30)
+		dbCollector.Start()
+		defer dbCollector.Stop()
+
 		log.Printf("Metrics enabled on port %d", cfg.Metrics.Port)
 	}
 

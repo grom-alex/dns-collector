@@ -157,8 +157,9 @@ func (db *Database) Close() error {
 	return nil
 }
 
-// InsertOrGetDomain inserts a new domain or returns existing one
-func (db *Database) InsertOrGetDomain(domain string, maxResolv int) (*Domain, error) {
+// InsertOrGetDomain inserts a new domain or returns existing one.
+// Returns the domain, a boolean indicating if it was newly created, and any error.
+func (db *Database) InsertOrGetDomain(domain string, maxResolv int) (*Domain, bool, error) {
 	now := time.Now()
 
 	// Use INSERT ... ON CONFLICT for upsert
@@ -179,13 +180,14 @@ func (db *Database) InsertOrGetDomain(domain string, maxResolv int) (*Domain, er
 			domain,
 		).Scan(&d.ID, &d.Domain, &d.TimeInsert, &d.ResolvCount, &d.MaxResolv, &d.LastResolvTime, &d.LastSeen)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get existing domain: %w", err)
+			return nil, false, fmt.Errorf("failed to get existing domain: %w", err)
 		}
+		return &d, false, nil // existing domain
 	} else if err != nil {
-		return nil, fmt.Errorf("failed to insert domain: %w", err)
+		return nil, false, fmt.Errorf("failed to insert domain: %w", err)
 	}
 
-	return &d, nil
+	return &d, true, nil // new domain
 }
 
 // GetDomainsToResolve returns domains that need to be resolved
@@ -335,6 +337,26 @@ func (db *Database) UpdateDomainLastSeen(domainID int64) error {
 	}
 
 	return nil
+}
+
+// GetDomainsCount returns the total number of domains in the database.
+func (db *Database) GetDomainsCount() (int64, error) {
+	var count int64
+	err := db.DB.QueryRow(`SELECT COUNT(*) FROM domain`).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count domains: %w", err)
+	}
+	return count, nil
+}
+
+// GetIPsCount returns the total number of IP addresses in the database.
+func (db *Database) GetIPsCount() (int64, error) {
+	var count int64
+	err := db.DB.QueryRow(`SELECT COUNT(*) FROM ip`).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count IPs: %w", err)
+	}
+	return count, nil
 }
 
 // DeleteExpiredIPs deletes IP addresses older than the specified TTL

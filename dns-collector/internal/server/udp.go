@@ -110,7 +110,7 @@ func (s *UDPServer) handleMessage(data []byte) {
 	}
 
 	// Insert or get domain
-	domain, err := s.db.InsertOrGetDomain(query.Domain, s.cfg.Resolver.MaxResolv)
+	domain, isNew, err := s.db.InsertOrGetDomain(query.Domain, s.cfg.Resolver.MaxResolv)
 	if err != nil {
 		log.Printf("Error inserting domain: %v", err)
 		return
@@ -126,6 +126,9 @@ func (s *UDPServer) handleMessage(data []byte) {
 		m.ServerMessagesReceived.WithLabelValues("valid").Inc()
 		m.ServerDomainsReceived.WithLabelValues(query.RType).Inc()
 		m.ServerProcessingTime.Observe(time.Since(start).Seconds())
+		if isNew {
+			m.ServerNewDomains.Inc()
+		}
 	})
 }
 
