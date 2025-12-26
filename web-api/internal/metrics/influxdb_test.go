@@ -62,7 +62,9 @@ func TestInfluxDBClientStartWithUnhealthyServer(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.URL.Path, "/health") {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"status": "fail"}`))
+			if _, err := w.Write([]byte(`{"status": "fail"}`)); err != nil {
+				t.Logf("Failed to write response: %v", err)
+			}
 		}
 	}))
 	defer server.Close()

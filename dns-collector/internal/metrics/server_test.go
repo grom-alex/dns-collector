@@ -56,7 +56,11 @@ func TestMetricsEndpointReturnsPrometheusFormat(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to start metrics server: %v", err)
 	}
-	defer server.Stop()
+	defer func() {
+		if err := server.Stop(); err != nil {
+			t.Logf("Failed to stop server: %v", err)
+		}
+	}()
 
 	// Give server time to start
 	time.Sleep(100 * time.Millisecond)
@@ -66,7 +70,11 @@ func TestMetricsEndpointReturnsPrometheusFormat(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to fetch metrics: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Logf("Failed to close response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", resp.StatusCode)
@@ -139,7 +147,11 @@ func TestMetricsEndpointWithLabels(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to start metrics server: %v", err)
 	}
-	defer server.Stop()
+	defer func() {
+		if err := server.Stop(); err != nil {
+			t.Logf("Failed to stop server: %v", err)
+		}
+	}()
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -147,7 +159,11 @@ func TestMetricsEndpointWithLabels(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to fetch metrics: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Logf("Failed to close response body: %v", err)
+		}
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -187,7 +203,11 @@ func TestMetricsEndpointContentType(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to start metrics server: %v", err)
 	}
-	defer server.Stop()
+	defer func() {
+		if err := server.Stop(); err != nil {
+			t.Logf("Failed to stop server: %v", err)
+		}
+	}()
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -195,7 +215,11 @@ func TestMetricsEndpointContentType(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to fetch metrics: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Logf("Failed to close response body: %v", err)
+		}
+	}()
 
 	contentType := resp.Header.Get("Content-Type")
 	if !strings.Contains(contentType, "text/plain") {
@@ -215,7 +239,9 @@ func TestMetricsServerInvalidPort(t *testing.T) {
 
 	err := server.Start()
 	if err == nil {
-		server.Stop()
+		if err := server.Stop(); err != nil {
+			t.Logf("Failed to stop server: %v", err)
+		}
 		t.Error("Expected error when starting server with invalid port")
 	}
 }
@@ -234,7 +260,11 @@ func TestMetricsServerMultipleRequests(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to start metrics server: %v", err)
 	}
-	defer server.Stop()
+	defer func() {
+		if err := server.Stop(); err != nil {
+			t.Logf("Failed to stop server: %v", err)
+		}
+	}()
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -248,7 +278,11 @@ func TestMetricsServerMultipleRequests(t *testing.T) {
 				results <- err
 				return
 			}
-			defer resp.Body.Close()
+			defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Logf("Failed to close response body: %v", err)
+		}
+	}()
 
 			if resp.StatusCode != http.StatusOK {
 				results <- http.ErrServerClosed
@@ -290,7 +324,9 @@ func TestMetricsServerGracefulShutdown(t *testing.T) {
 	go func() {
 		resp, err := http.Get("http://localhost:9096/metrics")
 		if err == nil {
-			resp.Body.Close()
+			if err := resp.Body.Close(); err != nil {
+				t.Logf("Failed to close response body: %v", err)
+			}
 		}
 		done <- true
 	}()
@@ -322,7 +358,11 @@ func TestMetricsEndpoint404OnWrongPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to start metrics server: %v", err)
 	}
-	defer server.Stop()
+	defer func() {
+		if err := server.Stop(); err != nil {
+			t.Logf("Failed to stop server: %v", err)
+		}
+	}()
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -331,7 +371,11 @@ func TestMetricsEndpoint404OnWrongPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to make request: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Logf("Failed to close response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusNotFound {
 		t.Errorf("Expected status 404, got %d", resp.StatusCode)
