@@ -33,6 +33,7 @@ type InfluxDBClient struct {
 	writeAPI api.WriteAPIBlocking
 	stopCh   chan struct{}
 	doneCh   chan struct{}
+	started  bool
 }
 
 // NewInfluxDBClient creates a new InfluxDB client for pushing metrics.
@@ -79,6 +80,7 @@ func (c *InfluxDBClient) Start() error {
 	log.Printf("InfluxDB client connected to %s (org: %s, bucket: %s)",
 		c.cfg.URL, c.cfg.Organization, c.cfg.Bucket)
 
+	c.started = true
 	go c.pushLoop()
 	return nil
 }
@@ -86,8 +88,13 @@ func (c *InfluxDBClient) Start() error {
 // Stop stops the InfluxDB client.
 func (c *InfluxDBClient) Stop() error {
 	log.Println("Stopping InfluxDB client...")
-	close(c.stopCh)
-	<-c.doneCh
+
+	// Only wait for doneCh if Start() was called
+	if c.started {
+		close(c.stopCh)
+		<-c.doneCh
+	}
+
 	c.client.Close()
 	log.Println("InfluxDB client stopped")
 	return nil
@@ -133,9 +140,26 @@ func (c *InfluxDBClient) pushMetrics() error {
 		}
 	}
 
+	// Batch write all points - continue on partial failures
+	var lastErr error
+	failedCount := 0
+	successCount := 0
+
 	for _, point := range points {
 		if err := c.writeAPI.WritePoint(ctx, point); err != nil {
-			return fmt.Errorf("failed to write point: %w", err)
+			failedCount++
+			lastErr = err
+			log.Printf("Warning: Failed to write metric point %s: %v", point.Name(), err)
+		} else {
+			successCount++
+		}
+	}
+
+	if failedCount > 0 {
+		log.Printf("InfluxDB batch write completed: %d succeeded, %d failed", successCount, failedCount)
+		// Return error only if all points failed
+		if successCount == 0 {
+			return fmt.Errorf("all %d points failed to write: %w", failedCount, lastErr)
 		}
 	}
 

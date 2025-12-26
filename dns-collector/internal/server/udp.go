@@ -69,14 +69,32 @@ func (s *UDPServer) listen() {
 				continue
 			}
 
+			// Create a copy of the data to avoid buffer reuse issues
+			// This prevents "data changing underfoot" when processing in goroutine
+			data := make([]byte, n)
+			copy(data, buffer[:n])
+
 			// Process message in a separate goroutine
-			go s.handleMessage(buffer[:n])
+			go s.handleMessage(data)
 		}
 	}
 }
 
 func (s *UDPServer) handleMessage(data []byte) {
+	// Add panic recovery to prevent crashes from unexpected errors
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Recovered from panic in handleMessage: %v, raw message: %q", r, string(data))
+			s.recordMetric(func(m *metrics.Registry) {
+				m.ServerMessagesReceived.WithLabelValues("invalid").Inc()
+			})
+		}
+	}()
+
 	start := time.Now()
+
+	// Trim any trailing null bytes or whitespace that might corrupt JSON
+	data = trimInvalidJSONSuffix(data)
 
 	var query DNSQuery
 	if err := json.Unmarshal(data, &query); err != nil {
@@ -130,6 +148,26 @@ func (s *UDPServer) handleMessage(data []byte) {
 			m.ServerNewDomains.Inc()
 		}
 	})
+}
+
+// trimInvalidJSONSuffix removes trailing garbage that may corrupt JSON parsing
+func trimInvalidJSONSuffix(data []byte) []byte {
+	// Try to find the first valid JSON object by iterating and testing
+	// Start from the end and work backwards to find the first position
+	// where we have valid JSON
+	for i := len(data); i > 0; i-- {
+		if data[i-1] == '}' {
+			// Try to parse as JSON
+			var query DNSQuery
+			if err := json.Unmarshal(data[:i], &query); err == nil {
+				// Valid JSON found, trim everything after
+				return data[:i]
+			}
+		}
+	}
+
+	// No valid JSON found, return as-is
+	return data
 }
 
 // recordMetric safely records a metric if metrics are enabled.

@@ -263,3 +263,93 @@ func TestStopChannel(t *testing.T) {
 		t.Error("stopCh should be closed")
 	}
 }
+
+func TestTrimInvalidJSONSuffix(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []byte
+		expected []byte
+	}{
+		{
+			name:     "valid JSON",
+			input:    []byte(`{"domain":"example.com"}`),
+			expected: []byte(`{"domain":"example.com"}`),
+		},
+		{
+			name:     "JSON with trailing garbage e",
+			input:    []byte(`{"domain":"example.com"}e"`),
+			expected: []byte(`{"domain":"example.com"}`),
+		},
+		{
+			name:     "JSON with trailing garbage he",
+			input:    []byte(`{"domain":"example.com"}he"`),
+			expected: []byte(`{"domain":"example.com"}`),
+		},
+		{
+			name:     "JSON with null bytes",
+			input:    []byte("{\"domain\":\"example.com\"}\x00\x00"),
+			expected: []byte(`{"domain":"example.com"}`),
+		},
+		{
+			name:     "JSON with trailing quote and brace",
+			input:    []byte(`{"client_ip":"192.168.0.50","domain":"ev.adriver.ru.","qtype":"A","rtype":"cache"}e"}`),
+			expected: []byte(`{"client_ip":"192.168.0.50","domain":"ev.adriver.ru.","qtype":"A","rtype":"cache"}`),
+		},
+		{
+			name:     "truncated JSON without closing brace",
+			input:    []byte(`{"domain":"exam`),
+			expected: []byte(`{"domain":"exam`),
+		},
+		{
+			name:     "empty data",
+			input:    []byte{},
+			expected: []byte{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := trimInvalidJSONSuffix(tt.input)
+			if string(result) != string(tt.expected) {
+				t.Errorf("trimInvalidJSONSuffix() = %q, want %q", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestTrimInvalidJSONSuffix_RealWorldCases(t *testing.T) {
+	// Test real-world cases from production logs
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "production case 1 - trailing e quote brace",
+			input:    `{"client_ip": "192.168.0.50", "domain": "ev.adriver.ru.", "qtype": "A", "rtype": "cache"}e"}`,
+			expected: `{"client_ip": "192.168.0.50", "domain": "ev.adriver.ru.", "qtype": "A", "rtype": "cache"}`,
+		},
+		{
+			name:     "production case 2 - trailing he quote brace",
+			input:    `{"client_ip": "192.168.0.74", "domain": "ev.adriver.ru.", "qtype": "A", "rtype": "cache"}he"}`,
+			expected: `{"client_ip": "192.168.0.74", "domain": "ev.adriver.ru.", "qtype": "A", "rtype": "cache"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := trimInvalidJSONSuffix([]byte(tt.input))
+			resultStr := string(result)
+
+			// Verify the result is valid JSON
+			var query DNSQuery
+			if err := json.Unmarshal(result, &query); err != nil {
+				t.Errorf("Result is not valid JSON: %v, got: %q", err, resultStr)
+			}
+
+			if resultStr != tt.expected {
+				t.Errorf("trimInvalidJSONSuffix() = %q, want %q", resultStr, tt.expected)
+			}
+		})
+	}
+}
