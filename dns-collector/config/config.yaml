@@ -24,6 +24,7 @@ retention:
   stats_days: 30  # Keep statistics for 30 days (1 month)
   cleanup_interval_hours: 24  # Run cleanup every 24 hours (once per day)
   ip_ttl_days: 3  # IP addresses TTL (3 days) - only active domains have old IPs cleaned
+  domain_ttl_days: 30  # Delete domains not queried in 30 days (0 = disabled, domains with NULL last_seen preserved)
 
 metrics:
   enabled: true

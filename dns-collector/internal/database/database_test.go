@@ -285,4 +285,144 @@ func TestDeleteOldStats_NoneDeleted(t *testing.T) {
 	}
 }
 
+func TestDeleteOldDomains_Success(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("Failed to create mock: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	database := &Database{DB: db}
+
+	// Expect transaction begin
+	mock.ExpectBegin()
+
+	// Expect IP deletion
+	mock.ExpectExec(`DELETE FROM ip WHERE domain_id IN`).
+		WithArgs(sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 5))
+
+	// Expect domain deletion
+	mock.ExpectExec(`DELETE FROM domain WHERE last_seen IS NOT NULL AND last_seen <`).
+		WithArgs(sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 2))
+
+	// Expect transaction commit
+	mock.ExpectCommit()
+
+	domainsDeleted, ipsDeleted, err := database.DeleteOldDomains(30)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	if domainsDeleted != 2 {
+		t.Errorf("Expected 2 domains deleted, got %d", domainsDeleted)
+	}
+
+	if ipsDeleted != 5 {
+		t.Errorf("Expected 5 IPs deleted, got %d", ipsDeleted)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("Unfulfilled expectations: %v", err)
+	}
+}
+
+func TestDeleteOldDomains_NoneDeleted(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("Failed to create mock: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	database := &Database{DB: db}
+
+	mock.ExpectBegin()
+	mock.ExpectExec(`DELETE FROM ip WHERE domain_id IN`).
+		WithArgs(sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec(`DELETE FROM domain WHERE last_seen IS NOT NULL AND last_seen <`).
+		WithArgs(sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectCommit()
+
+	domainsDeleted, ipsDeleted, err := database.DeleteOldDomains(30)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	if domainsDeleted != 0 {
+		t.Errorf("Expected 0 domains deleted, got %d", domainsDeleted)
+	}
+
+	if ipsDeleted != 0 {
+		t.Errorf("Expected 0 IPs deleted, got %d", ipsDeleted)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("Unfulfilled expectations: %v", err)
+	}
+}
+
+func TestDeleteOldDomains_Disabled(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("Failed to create mock: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	database := &Database{DB: db}
+
+	// Should not execute any queries when TTL is 0 or negative
+	domainsDeleted, ipsDeleted, err := database.DeleteOldDomains(0)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	if domainsDeleted != 0 {
+		t.Errorf("Expected 0 domains deleted, got %d", domainsDeleted)
+	}
+
+	if ipsDeleted != 0 {
+		t.Errorf("Expected 0 IPs deleted, got %d", ipsDeleted)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("Unfulfilled expectations: %v", err)
+	}
+}
+
+func TestDeleteOldDomains_TransactionError(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("Failed to create mock: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	database := &Database{DB: db}
+
+	mock.ExpectBegin()
+	mock.ExpectExec(`DELETE FROM ip WHERE domain_id IN`).
+		WithArgs(sqlmock.AnyArg()).
+		WillReturnError(sql.ErrConnDone)
+	mock.ExpectRollback()
+
+	domainsDeleted, ipsDeleted, err := database.DeleteOldDomains(30)
+	if err == nil {
+		t.Error("Expected error but got nil")
+	}
+
+	if domainsDeleted != 0 {
+		t.Errorf("Expected 0 domains deleted on error, got %d", domainsDeleted)
+	}
+
+	if ipsDeleted != 0 {
+		t.Errorf("Expected 0 IPs deleted on error, got %d", ipsDeleted)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("Unfulfilled expectations: %v", err)
+	}
+}
+
 

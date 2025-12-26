@@ -24,6 +24,7 @@ retention:
   stats_days: 7        # Keep statistics for 7 days in development
   cleanup_interval_hours: 12  # More frequent cleanup in development (every 12 hours)
   ip_ttl_days: 1       # Shorter IP TTL for development (1 day)
+  domain_ttl_days: 7   # Shorter period for development (7 days, 0 = disabled)
 
 metrics:
   enabled: true

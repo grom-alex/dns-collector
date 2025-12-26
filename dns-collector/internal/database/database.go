@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -390,4 +391,72 @@ func (db *Database) DeleteExpiredIPs(ttlDays int) (int64, error) {
 	}
 
 	return deleted, nil
+}
+
+// DeleteOldDomains deletes domains not seen in the specified TTL period
+// Also explicitly deletes associated IPs first for better metrics tracking
+// Domains with NULL last_seen are preserved (never queried, only resolved)
+// Returns counts: (domains deleted, IPs deleted, error)
+func (db *Database) DeleteOldDomains(ttlDays int) (int64, int64, error) {
+	if ttlDays <= 0 {
+		return 0, 0, nil // TTL disabled
+	}
+
+	cutoffTime := time.Now().AddDate(0, 0, -ttlDays)
+
+	// Start transaction for atomic operation
+	tx, err := db.DB.Begin()
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() {
+		if err := tx.Rollback(); err != nil {
+			log.Printf("Error rolling back transaction: %v", err)
+		}
+	}()
+
+	// Step 1: Explicitly delete IPs for old domains (for metrics tracking)
+	// Only delete domains where last_seen is NOT NULL and is old
+	ipResult, err := tx.Exec(
+		`DELETE FROM ip
+		WHERE domain_id IN (
+			SELECT id FROM domain
+			WHERE last_seen IS NOT NULL
+			AND last_seen < $1
+		)`,
+		cutoffTime,
+	)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to delete IPs for old domains: %w", err)
+	}
+
+	ipsDeleted, err := ipResult.RowsAffected()
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to get IP rows affected: %w", err)
+	}
+
+	// Step 2: Delete old domains (with non-NULL last_seen)
+	// Domains with NULL last_seen are preserved (these are domains that were
+	// added for resolution but never actually queried by clients)
+	domainResult, err := tx.Exec(
+		`DELETE FROM domain
+		WHERE last_seen IS NOT NULL
+		AND last_seen < $1`,
+		cutoffTime,
+	)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to delete old domains: %w", err)
+	}
+
+	domainsDeleted, err := domainResult.RowsAffected()
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to get domain rows affected: %w", err)
+	}
+
+	// Commit transaction
+	if err := tx.Commit(); err != nil {
+		return 0, 0, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return domainsDeleted, ipsDeleted, nil
 }

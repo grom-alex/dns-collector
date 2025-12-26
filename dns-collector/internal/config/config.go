@@ -50,7 +50,8 @@ type WebAPIConfig struct {
 type RetentionConfig struct {
 	StatsDays            int `yaml:"stats_days"`
 	CleanupIntervalHours int `yaml:"cleanup_interval_hours"`
-	IPTTLDays            int `yaml:"ip_ttl_days"` // TTL for IP addresses in days
+	IPTTLDays            int `yaml:"ip_ttl_days"`     // TTL for IP addresses in days
+	DomainTTLDays        int `yaml:"domain_ttl_days"` // TTL for domains in days
 }
 
 type MetricsConfig struct {
@@ -131,6 +132,15 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Retention.IPTTLDays > 90 {
 		return nil, fmt.Errorf("retention ip_ttl_days must not exceed 90 days, got %d", cfg.Retention.IPTTLDays)
+	}
+
+	// Validate domain TTL: 0 means disabled, otherwise must be between 1 and 365 days
+	if cfg.Retention.DomainTTLDays < 0 {
+		cfg.Retention.DomainTTLDays = 0 // disabled
+	}
+	// Note: DomainTTLDays == 0 is valid and means disabled (no default applied)
+	if cfg.Retention.DomainTTLDays > 365 {
+		return nil, fmt.Errorf("retention domain_ttl_days must not exceed 365 days, got %d", cfg.Retention.DomainTTLDays)
 	}
 
 	// Validate cyclic resolv cooldown

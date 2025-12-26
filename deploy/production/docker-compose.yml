@@ -42,7 +42,7 @@ services:
       start_period: 10s
 
   dns-collector:
-    image: registry.gromas.ru/apps/dns-collector/dns-collector:2.6.2
+    image: registry.gromas.ru/apps/dns-collector/dns-collector:2.7.0
     pull_policy: always
     container_name: dns-collector
 
@@ -81,7 +81,7 @@ services:
         max-file: "5"
 
   web-api:
-    image: registry.gromas.ru/apps/dns-collector/web-api:2.6.2
+    image: registry.gromas.ru/apps/dns-collector/web-api:2.7.0
     pull_policy: always
     container_name: dns-collector-webapi
 

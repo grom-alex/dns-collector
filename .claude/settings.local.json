@@ -15,7 +15,9 @@
       "Bash(docker inspect:*)",
       "Bash(make test-unit:*)",
       "Bash(make test:*)",
-      "Bash(docker push:*)"
+      "Bash(docker push:*)",
+      "Bash(go test:*)",
+      "Bash(gh pr list:*)"
     ]
   }
 }
