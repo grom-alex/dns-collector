@@ -133,9 +133,26 @@ func (c *InfluxDBClient) pushMetrics() error {
 		}
 	}
 
+	// Batch write all points - continue on partial failures
+	var lastErr error
+	failedCount := 0
+	successCount := 0
+
 	for _, point := range points {
 		if err := c.writeAPI.WritePoint(ctx, point); err != nil {
-			return fmt.Errorf("failed to write point: %w", err)
+			failedCount++
+			lastErr = err
+			log.Printf("Warning: Failed to write metric point %s: %v", point.Name(), err)
+		} else {
+			successCount++
+		}
+	}
+
+	if failedCount > 0 {
+		log.Printf("InfluxDB batch write completed: %d succeeded, %d failed", successCount, failedCount)
+		// Return error only if all points failed
+		if successCount == 0 {
+			return fmt.Errorf("all %d points failed to write: %w", failedCount, lastErr)
 		}
 	}
 
