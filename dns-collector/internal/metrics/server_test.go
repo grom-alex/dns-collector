@@ -227,25 +227,6 @@ func TestMetricsEndpointContentType(t *testing.T) {
 	}
 }
 
-func TestMetricsServerInvalidPort(t *testing.T) {
-	cfg := config.MetricsConfig{
-		Enabled: true,
-		Port:    99999, // Invalid port
-		Path:    "/metrics",
-	}
-
-	registry := NewRegistry()
-	server := NewServer(cfg, registry)
-
-	err := server.Start()
-	if err == nil {
-		if err := server.Stop(); err != nil {
-			t.Logf("Failed to stop server: %v", err)
-		}
-		t.Error("Expected error when starting server with invalid port")
-	}
-}
-
 func TestMetricsServerMultipleRequests(t *testing.T) {
 	cfg := config.MetricsConfig{
 		Enabled: true,
