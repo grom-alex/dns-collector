@@ -10,6 +10,7 @@ import (
 	"dns-collector/internal/cleanup"
 	"dns-collector/internal/config"
 	"dns-collector/internal/database"
+	"dns-collector/internal/metrics"
 	"dns-collector/internal/resolver"
 	"dns-collector/internal/server"
 )
@@ -54,20 +55,53 @@ func main() {
 	}
 	log.Println("Migrations completed successfully")
 
+	// Initialize metrics registry
+	var metricsRegistry *metrics.Registry
+	if cfg.Metrics.Enabled {
+		metricsRegistry = metrics.NewRegistry()
+
+		// Start metrics HTTP server
+		metricsServer := metrics.NewServer(cfg.Metrics, metricsRegistry)
+		if err := metricsServer.Start(); err != nil {
+			log.Fatalf("Failed to start metrics server: %v", err)
+		}
+		defer func() {
+			if err := metricsServer.Stop(); err != nil {
+				log.Printf("Error stopping metrics server: %v", err)
+			}
+		}()
+
+		// Start InfluxDB client if enabled
+		if cfg.Metrics.InfluxDB.Enabled {
+			influxClient := metrics.NewInfluxDBClient(cfg.Metrics.InfluxDB, metricsRegistry)
+			if err := influxClient.Start(); err != nil {
+				log.Printf("Warning: Failed to start InfluxDB client: %v", err)
+			} else {
+				defer func() {
+					if err := influxClient.Stop(); err != nil {
+						log.Printf("Error stopping InfluxDB client: %v", err)
+					}
+				}()
+			}
+		}
+
+		log.Printf("Metrics enabled on port %d", cfg.Metrics.Port)
+	}
+
 	// Create and start UDP server
-	udpServer := server.NewUDPServer(cfg, db)
+	udpServer := server.NewUDPServer(cfg, db, metricsRegistry)
 	if err := udpServer.Start(); err != nil {
 		log.Fatalf("Failed to start UDP server: %v", err)
 	}
 	defer udpServer.Stop()
 
 	// Create and start DNS resolver
-	dnsResolver := resolver.NewResolver(cfg, db)
+	dnsResolver := resolver.NewResolver(cfg, db, metricsRegistry)
 	dnsResolver.Start()
 	defer dnsResolver.Stop()
 
 	// Create and start cleanup service
-	cleanupService := cleanup.NewService(cfg, db)
+	cleanupService := cleanup.NewService(cfg, db, metricsRegistry)
 	cleanupService.Start()
 	defer cleanupService.Stop()
 

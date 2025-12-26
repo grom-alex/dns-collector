@@ -6,10 +6,12 @@ import (
 
 	"dns-collector/internal/config"
 	"dns-collector/internal/database"
+	"dns-collector/internal/metrics"
 )
 
 type Service struct {
 	db              *database.Database
+	metrics         *metrics.Registry
 	retentionDays   int
 	ipTTLDays       int
 	cleanupInterval time.Duration
@@ -17,9 +19,10 @@ type Service struct {
 	doneChan        chan struct{}
 }
 
-func NewService(cfg *config.Config, db *database.Database) *Service {
+func NewService(cfg *config.Config, db *database.Database, m *metrics.Registry) *Service {
 	return &Service{
 		db:              db,
+		metrics:         m,
 		retentionDays:   cfg.Retention.StatsDays,
 		ipTTLDays:       cfg.Retention.IPTTLDays,
 		cleanupInterval: time.Duration(cfg.Retention.CleanupIntervalHours) * time.Hour,
@@ -61,7 +64,13 @@ func (s *Service) run() {
 }
 
 func (s *Service) cleanup() {
+	start := time.Now()
 	log.Printf("Running cleanup (stats: %d days, IP TTL: %d days)...", s.retentionDays, s.ipTTLDays)
+
+	// Record cleanup run
+	s.recordMetric(func(m *metrics.Registry) {
+		m.CleanupRuns.Inc()
+	})
 
 	// 1. Cleanup old statistics
 	statsDeleted, err := s.db.DeleteOldStats(s.retentionDays)
@@ -71,6 +80,11 @@ func (s *Service) cleanup() {
 		log.Printf("Stats cleanup: deleted %d old records", statsDeleted)
 	}
 
+	// Record stats cleanup metrics
+	s.recordMetric(func(m *metrics.Registry) {
+		m.CleanupStatsDeleted.Add(float64(statsDeleted))
+	})
+
 	// 2. Cleanup expired IP addresses (only for active domains)
 	if s.ipTTLDays > 0 {
 		ipsDeleted, err := s.db.DeleteExpiredIPs(s.ipTTLDays)
@@ -79,7 +93,24 @@ func (s *Service) cleanup() {
 		} else if ipsDeleted > 0 {
 			log.Printf("IP cleanup: deleted %d expired IP addresses", ipsDeleted)
 		}
+
+		// Record IP cleanup metrics
+		s.recordMetric(func(m *metrics.Registry) {
+			m.CleanupIPsDeleted.Add(float64(ipsDeleted))
+		})
 	}
 
+	// Record cleanup duration
+	s.recordMetric(func(m *metrics.Registry) {
+		m.CleanupDuration.Observe(time.Since(start).Seconds())
+	})
+
 	log.Println("Cleanup completed")
+}
+
+// recordMetric safely records a metric if metrics are enabled.
+func (s *Service) recordMetric(f func(m *metrics.Registry)) {
+	if s.metrics != nil {
+		f(s.metrics)
+	}
 }

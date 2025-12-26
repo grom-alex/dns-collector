@@ -19,6 +19,17 @@ cors:
     - "http://localhost:5173"
   allow_credentials: true
 
+metrics:
+  enabled: true
+  path: "/metrics"
+  influxdb:
+    enabled: false
+    url: "http://influxdb:8086"
+    token: ""  # Set via INFLUXDB_TOKEN env var
+    organization: "my-org"
+    bucket: "dns-metrics"
+    interval_seconds: 10
+
 export_lists:
   - name: "Example Domain List"
     endpoint: "/export/example"

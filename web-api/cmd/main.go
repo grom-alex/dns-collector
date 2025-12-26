@@ -19,6 +19,7 @@ import (
 
 	"dns-collector-webapi/internal/database"
 	"dns-collector-webapi/internal/handlers"
+	"dns-collector-webapi/internal/metrics"
 )
 
 type Config struct {
@@ -41,7 +42,14 @@ type Config struct {
 		AllowedOrigins   []string `yaml:"allowed_origins"`
 		AllowCredentials bool     `yaml:"allow_credentials"`
 	} `yaml:"cors"`
+	Metrics     MetricsConfig      `yaml:"metrics"`
 	ExportLists []ExportListConfig `yaml:"export_lists"`
+}
+
+type MetricsConfig struct {
+	Enabled  bool                   `yaml:"enabled"`
+	Path     string                 `yaml:"path"`
+	InfluxDB metrics.InfluxDBConfig `yaml:"influxdb"`
 }
 
 type ExportListConfig struct {
@@ -97,6 +105,19 @@ func loadConfig(path string) (*Config, error) {
 	}
 	if cfg.Server.Host == "" {
 		cfg.Server.Host = "0.0.0.0"
+	}
+
+	// Set defaults for metrics
+	if cfg.Metrics.Path == "" {
+		cfg.Metrics.Path = "/metrics"
+	}
+	if cfg.Metrics.InfluxDB.IntervalSeconds <= 0 {
+		cfg.Metrics.InfluxDB.IntervalSeconds = 10
+	}
+
+	// Override InfluxDB token from environment variable if set
+	if envToken := os.Getenv("INFLUXDB_TOKEN"); envToken != "" {
+		cfg.Metrics.InfluxDB.Token = envToken
 	}
 
 	// Validate export lists configuration
@@ -265,6 +286,33 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}
 	router.Use(cors.New(corsConfig))
+
+	// Initialize metrics if enabled
+	if cfg.Metrics.Enabled {
+		metricsRegistry := metrics.NewRegistry()
+
+		// Add metrics middleware
+		router.Use(metrics.GinMiddleware(metricsRegistry))
+
+		// Register /metrics endpoint
+		router.GET(cfg.Metrics.Path, metrics.PrometheusHandler(metricsRegistry))
+
+		// Start InfluxDB client if enabled
+		if cfg.Metrics.InfluxDB.Enabled {
+			influxClient := metrics.NewInfluxDBClient(cfg.Metrics.InfluxDB, metricsRegistry)
+			if err := influxClient.Start(); err != nil {
+				log.Printf("Warning: Failed to start InfluxDB client: %v", err)
+			} else {
+				defer func() {
+					if err := influxClient.Stop(); err != nil {
+						log.Printf("Error stopping InfluxDB client: %v", err)
+					}
+				}()
+			}
+		}
+
+		log.Printf("Metrics enabled at %s", cfg.Metrics.Path)
+	}
 
 	// Health check
 	router.GET("/health", h.HealthCheck)

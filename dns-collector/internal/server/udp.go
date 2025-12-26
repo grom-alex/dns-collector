@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"time"
 
 	"dns-collector/internal/config"
 	"dns-collector/internal/database"
+	"dns-collector/internal/metrics"
 )
 
 type DNSQuery struct {
@@ -18,17 +20,19 @@ type DNSQuery struct {
 }
 
 type UDPServer struct {
-	cfg    *config.Config
-	db     *database.Database
-	conn   *net.UDPConn
-	stopCh chan struct{}
+	cfg     *config.Config
+	db      *database.Database
+	metrics *metrics.Registry
+	conn    *net.UDPConn
+	stopCh  chan struct{}
 }
 
-func NewUDPServer(cfg *config.Config, db *database.Database) *UDPServer {
+func NewUDPServer(cfg *config.Config, db *database.Database, m *metrics.Registry) *UDPServer {
 	return &UDPServer{
-		cfg:    cfg,
-		db:     db,
-		stopCh: make(chan struct{}),
+		cfg:     cfg,
+		db:      db,
+		metrics: m,
+		stopCh:  make(chan struct{}),
 	}
 }
 
@@ -72,15 +76,23 @@ func (s *UDPServer) listen() {
 }
 
 func (s *UDPServer) handleMessage(data []byte) {
+	start := time.Now()
+
 	var query DNSQuery
 	if err := json.Unmarshal(data, &query); err != nil {
 		log.Printf("Error parsing JSON: %v, raw message: %q", err, string(data))
+		s.recordMetric(func(m *metrics.Registry) {
+			m.ServerMessagesReceived.WithLabelValues("invalid").Inc()
+		})
 		return
 	}
 
 	// Validate required fields
 	if query.Domain == "" {
 		log.Printf("Empty domain in query")
+		s.recordMetric(func(m *metrics.Registry) {
+			m.ServerMessagesReceived.WithLabelValues("invalid").Inc()
+		})
 		return
 	}
 	if query.ClientIP == "" {
@@ -107,6 +119,20 @@ func (s *UDPServer) handleMessage(data []byte) {
 	// Update last_seen timestamp to track when domain was last queried
 	if err := s.db.UpdateDomainLastSeen(domain.ID); err != nil {
 		log.Printf("Error updating domain last_seen: %v", err)
+	}
+
+	// Record metrics
+	s.recordMetric(func(m *metrics.Registry) {
+		m.ServerMessagesReceived.WithLabelValues("valid").Inc()
+		m.ServerDomainsReceived.WithLabelValues(query.RType).Inc()
+		m.ServerProcessingTime.Observe(time.Since(start).Seconds())
+	})
+}
+
+// recordMetric safely records a metric if metrics are enabled.
+func (s *UDPServer) recordMetric(f func(m *metrics.Registry)) {
+	if s.metrics != nil {
+		f(s.metrics)
 	}
 }
 

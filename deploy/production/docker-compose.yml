@@ -42,12 +42,13 @@ services:
       start_period: 10s
 
   dns-collector:
-    image: registry.gromas.ru/apps/dns-collector/dns-collector:v2.5.1
+    image: registry.gromas.ru/apps/dns-collector/dns-collector:v2.6.0
     pull_policy: always
     container_name: dns-collector
 
     ports:
       - "5353:5353/udp"
+      - "9090:9090"  # Prometheus metrics endpoint
 
     volumes:
       - ./config/dns-collector.yaml:/app/config/config.yaml:ro
@@ -56,6 +57,7 @@ services:
       - TZ=${TZ:-UTC}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-CHANGE_ME_IN_PRODUCTION}
       - POSTGRES_SSL_MODE=${POSTGRES_SSL_MODE:-disable}
+      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN:-}
 
     restart: unless-stopped
 
@@ -79,7 +81,7 @@ services:
         max-file: "5"
 
   web-api:
-    image: registry.gromas.ru/apps/dns-collector/web-api:v2.5.1
+    image: registry.gromas.ru/apps/dns-collector/web-api:v2.6.0
     pull_policy: always
     container_name: dns-collector-webapi
 
@@ -93,6 +95,7 @@ services:
       - TZ=${TZ:-UTC}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-CHANGE_ME_IN_PRODUCTION}
       - POSTGRES_SSL_MODE=${POSTGRES_SSL_MODE:-disable}
+      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN:-}
 
     restart: unless-stopped
 

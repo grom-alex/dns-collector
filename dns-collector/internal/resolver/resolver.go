@@ -6,26 +6,31 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"dns-collector/internal/config"
 	"dns-collector/internal/database"
+	"dns-collector/internal/metrics"
 )
 
 type Resolver struct {
-	cfg     *config.Config
-	db      *database.Database
-	ticker  *time.Ticker
-	stopCh  chan struct{}
-	wg      sync.WaitGroup
-	dnsConf *net.Resolver
+	cfg           *config.Config
+	db            *database.Database
+	metrics       *metrics.Registry
+	ticker        *time.Ticker
+	stopCh        chan struct{}
+	wg            sync.WaitGroup
+	dnsConf       *net.Resolver
+	activeWorkers int32
 }
 
-func NewResolver(cfg *config.Config, db *database.Database) *Resolver {
+func NewResolver(cfg *config.Config, db *database.Database, m *metrics.Registry) *Resolver {
 	return &Resolver{
-		cfg:    cfg,
-		db:     db,
-		stopCh: make(chan struct{}),
+		cfg:     cfg,
+		db:      db,
+		metrics: m,
+		stopCh:  make(chan struct{}),
 		dnsConf: &net.Resolver{
 			PreferGo: true,
 			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
@@ -85,6 +90,11 @@ func (r *Resolver) runResolution() {
 
 	log.Printf("Found %d domains to resolve", len(domains))
 
+	// Record batch size metric
+	r.recordMetric(func(m *metrics.Registry) {
+		m.ResolverBatchSize.Set(float64(len(domains)))
+	})
+
 	// Create worker pool
 	domainCh := make(chan database.Domain, len(domains))
 	var wg sync.WaitGroup
@@ -104,11 +114,29 @@ func (r *Resolver) runResolution() {
 	// Wait for all workers to finish
 	wg.Wait()
 
+	// Reset batch size after completion
+	r.recordMetric(func(m *metrics.Registry) {
+		m.ResolverBatchSize.Set(0)
+		m.ResolverActiveWorkers.Set(0)
+	})
+
 	log.Println("DNS resolution task completed")
 }
 
 func (r *Resolver) worker(id int, domainCh <-chan database.Domain, wg *sync.WaitGroup) {
 	defer wg.Done()
+
+	// Track active workers
+	atomic.AddInt32(&r.activeWorkers, 1)
+	r.recordMetric(func(m *metrics.Registry) {
+		m.ResolverActiveWorkers.Set(float64(atomic.LoadInt32(&r.activeWorkers)))
+	})
+	defer func() {
+		atomic.AddInt32(&r.activeWorkers, -1)
+		r.recordMetric(func(m *metrics.Registry) {
+			m.ResolverActiveWorkers.Set(float64(atomic.LoadInt32(&r.activeWorkers)))
+		})
+	}()
 
 	for domain := range domainCh {
 		log.Printf("Worker %d: Resolving %s", id, domain.Domain)
@@ -123,10 +151,21 @@ func (r *Resolver) resolveDomain(domain database.Domain) {
 	hasResults := false
 
 	// Resolve IPv4 addresses
+	ipv4Start := time.Now()
 	ipv4Addrs, err := r.dnsConf.LookupIP(ctx, "ip4", domain.Domain)
+	ipv4Duration := time.Since(ipv4Start).Seconds()
+
 	if err != nil {
 		log.Printf("Error resolving IPv4 for %s: %v", domain.Domain, err)
+		r.recordMetric(func(m *metrics.Registry) {
+			m.ResolverLookups.WithLabelValues("ipv4", "error").Inc()
+			m.ResolverLookupDuration.WithLabelValues("ipv4").Observe(ipv4Duration)
+		})
 	} else {
+		r.recordMetric(func(m *metrics.Registry) {
+			m.ResolverLookups.WithLabelValues("ipv4", "success").Inc()
+			m.ResolverLookupDuration.WithLabelValues("ipv4").Observe(ipv4Duration)
+		})
 		for _, ip := range ipv4Addrs {
 			ipStr := ip.String()
 			if err := r.db.InsertOrUpdateIP(domain.ID, ipStr, "ipv4"); err != nil {
@@ -139,10 +178,21 @@ func (r *Resolver) resolveDomain(domain database.Domain) {
 	}
 
 	// Resolve IPv6 addresses
+	ipv6Start := time.Now()
 	ipv6Addrs, err := r.dnsConf.LookupIP(ctx, "ip6", domain.Domain)
+	ipv6Duration := time.Since(ipv6Start).Seconds()
+
 	if err != nil {
 		log.Printf("Error resolving IPv6 for %s: %v", domain.Domain, err)
+		r.recordMetric(func(m *metrics.Registry) {
+			m.ResolverLookups.WithLabelValues("ipv6", "error").Inc()
+			m.ResolverLookupDuration.WithLabelValues("ipv6").Observe(ipv6Duration)
+		})
 	} else {
+		r.recordMetric(func(m *metrics.Registry) {
+			m.ResolverLookups.WithLabelValues("ipv6", "success").Inc()
+			m.ResolverLookupDuration.WithLabelValues("ipv6").Observe(ipv6Duration)
+		})
 		for _, ip := range ipv6Addrs {
 			ipStr := ip.String()
 			if err := r.db.InsertOrUpdateIP(domain.ID, ipStr, "ipv6"); err != nil {
@@ -161,9 +211,15 @@ func (r *Resolver) resolveDomain(domain database.Domain) {
 		log.Printf("Error updating domain stats for %s: %v", domain.Domain, err)
 	}
 
+	// Record domain processed metric
+	status := "success"
 	if !hasResults {
+		status = "no_results"
 		log.Printf("No IP addresses resolved for %s", domain.Domain)
 	}
+	r.recordMetric(func(m *metrics.Registry) {
+		m.ResolverDomainsProcessed.WithLabelValues(status).Inc()
+	})
 }
 
 // resolveCNAME can be used if you want to follow CNAME records
@@ -187,4 +243,11 @@ func (r *Resolver) Stop() {
 	}
 	r.wg.Wait()
 	log.Println("DNS resolver stopped")
+}
+
+// recordMetric safely records a metric if metrics are enabled.
+func (r *Resolver) recordMetric(f func(m *metrics.Registry)) {
+	if r.metrics != nil {
+		f(r.metrics)
+	}
 }
