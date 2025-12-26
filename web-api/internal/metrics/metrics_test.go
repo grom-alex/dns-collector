@@ -39,18 +39,6 @@ func TestNewRegistry(t *testing.T) {
 	if r.APIExportTotal == nil {
 		t.Error("APIExportTotal is nil")
 	}
-	if r.DBDomainsTotal == nil {
-		t.Error("DBDomainsTotal is nil")
-	}
-	if r.DBIPsTotal == nil {
-		t.Error("DBIPsTotal is nil")
-	}
-	if r.DBConnectionsOpen == nil {
-		t.Error("DBConnectionsOpen is nil")
-	}
-	if r.DBConnectionsIdle == nil {
-		t.Error("DBConnectionsIdle is nil")
-	}
 }
 
 func TestRegistryMetricsCanBeUsed(t *testing.T) {
@@ -67,10 +55,6 @@ func TestRegistryMetricsCanBeUsed(t *testing.T) {
 
 	// Test gauge operations
 	r.HTTPRequestsInFlight.Set(5)
-	r.DBDomainsTotal.Set(1000)
-	r.DBIPsTotal.Set(5000)
-	r.DBConnectionsOpen.Set(10)
-	r.DBConnectionsIdle.Set(3)
 
 	// Test histogram operations
 	r.HTTPRequestDuration.WithLabelValues("GET", "/api/stats").Observe(0.05)
@@ -100,10 +84,6 @@ func TestRegistryMetricsCanBeUsed(t *testing.T) {
 		"api_stats_queries_total",
 		"api_domains_queries_total",
 		"api_export_generated_total",
-		"db_domains_total",
-		"db_ips_total",
-		"db_connections_open",
-		"db_connections_idle",
 	}
 
 	for _, name := range expectedMetrics {

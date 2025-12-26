@@ -63,18 +63,6 @@ func TestNewRegistry(t *testing.T) {
 	if r.DBIPsTotal == nil {
 		t.Error("DBIPsTotal is nil")
 	}
-	if r.DBConnectionsOpen == nil {
-		t.Error("DBConnectionsOpen is nil")
-	}
-	if r.DBConnectionsIdle == nil {
-		t.Error("DBConnectionsIdle is nil")
-	}
-	if r.DBQueriesTotal == nil {
-		t.Error("DBQueriesTotal is nil")
-	}
-	if r.DBQueryDuration == nil {
-		t.Error("DBQueryDuration is nil")
-	}
 }
 
 func TestRegistryMetricsCanBeUsed(t *testing.T) {
@@ -95,21 +83,16 @@ func TestRegistryMetricsCanBeUsed(t *testing.T) {
 	r.CleanupIPsDeleted.Add(50)
 	r.CleanupRuns.Inc()
 
-	r.DBQueriesTotal.WithLabelValues("select", "success").Inc()
-
 	// Test gauge operations
 	r.ResolverBatchSize.Set(10)
 	r.ResolverActiveWorkers.Set(5)
 	r.DBDomainsTotal.Set(1000)
 	r.DBIPsTotal.Set(5000)
-	r.DBConnectionsOpen.Set(10)
-	r.DBConnectionsIdle.Set(3)
 
 	// Test histogram operations
 	r.ResolverLookupDuration.WithLabelValues("ipv4").Observe(0.05)
 	r.ServerProcessingTime.Observe(0.001)
 	r.CleanupDuration.Observe(5.0)
-	r.DBQueryDuration.WithLabelValues("select").Observe(0.01)
 
 	// Verify metrics can be gathered
 	mfs, err := r.GetRegistry().Gather()
@@ -143,10 +126,6 @@ func TestRegistryMetricsCanBeUsed(t *testing.T) {
 		"dns_cleanup_runs_total",
 		"dns_db_domains_total",
 		"dns_db_ips_total",
-		"dns_db_connections_open",
-		"dns_db_connections_idle",
-		"dns_db_queries_total",
-		"dns_db_query_duration_seconds",
 	}
 
 	for _, name := range expectedMetrics {

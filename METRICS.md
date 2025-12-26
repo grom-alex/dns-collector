@@ -48,7 +48,7 @@ Environment variable `INFLUXDB_TOKEN` overrides config file token.
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `dns_resolver_domains_processed_total` | Counter | `status` | Total domains processed (success/error) |
+| `dns_resolver_domains_processed_total` | Counter | `status` | Total domains processed (success/no_results) |
 | `dns_resolver_lookups_total` | Counter | `ip_version`, `status` | DNS lookups by IP version (ipv4/ipv6) and status |
 | `dns_resolver_lookup_duration_seconds` | Histogram | `ip_version` | DNS lookup duration |
 | `dns_resolver_batch_size` | Gauge | - | Current batch size being resolved |
@@ -59,7 +59,7 @@ Environment variable `INFLUXDB_TOKEN` overrides config file token.
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
 | `dns_server_messages_received_total` | Counter | `status` | Messages received (valid/invalid) |
-| `dns_server_domains_received_total` | Counter | `rtype` | Domains received by record type (cache/dns) |
+| `dns_server_domains_received_total` | Counter | `rtype` | Domains received by record type |
 | `dns_server_new_domains_total` | Counter | - | New unique domains registered |
 | `dns_server_processing_duration_seconds` | Histogram | - | Message processing time |
 
@@ -76,12 +76,8 @@ Environment variable `INFLUXDB_TOKEN` overrides config file token.
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `dns_db_domains_total` | Gauge | - | Total domains in database |
-| `dns_db_ips_total` | Gauge | - | Total IP addresses in database |
-| `dns_db_connections_open` | Gauge | - | Open database connections |
-| `dns_db_connections_idle` | Gauge | - | Idle database connections |
-| `dns_db_queries_total` | Counter | `type`, `status` | Database queries by type and status |
-| `dns_db_query_duration_seconds` | Histogram | `type` | Query duration by type |
+| `dns_db_domains_total` | Gauge | - | Total domains in database (updated every 30s) |
+| `dns_db_ips_total` | Gauge | - | Total IP addresses in database (updated every 30s) |
 
 ---
 
@@ -104,15 +100,7 @@ Automatically collected via Gin middleware.
 |--------|------|--------|-------------|
 | `api_stats_queries_total` | Counter | - | Queries to `/api/stats` |
 | `api_domains_queries_total` | Counter | - | Queries to `/api/domains` |
-
-### Database Metrics
-
-| Metric | Type | Labels | Description |
-|--------|------|--------|-------------|
-| `db_domains_total` | Gauge | - | Total domains in database |
-| `db_ips_total` | Gauge | - | Total IP addresses in database |
-| `db_connections_open` | Gauge | - | Open database connections |
-| `db_connections_idle` | Gauge | - | Idle database connections |
+| `api_export_generated_total` | Counter | `type` | Exports generated (stats_excel/domains_excel) |
 
 ---
 
@@ -178,4 +166,14 @@ rate(dns_resolver_lookups_total{status="error"}[5m])
 ### Database Size
 ```promql
 dns_db_domains_total + dns_db_ips_total
+```
+
+### New Domains Rate
+```promql
+rate(dns_server_new_domains_total[5m])
+```
+
+### Export Count by Type
+```promql
+sum by (type) (api_export_generated_total)
 ```

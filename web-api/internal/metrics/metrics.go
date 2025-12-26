@@ -19,12 +19,6 @@ type Registry struct {
 	APIStatsQueries   prometheus.Counter
 	APIDomainsQueries prometheus.Counter
 	APIExportTotal    *prometheus.CounterVec
-
-	// Database metrics
-	DBDomainsTotal    prometheus.Gauge
-	DBIPsTotal        prometheus.Gauge
-	DBConnectionsOpen prometheus.Gauge
-	DBConnectionsIdle prometheus.Gauge
 }
 
 // NewRegistry creates a new metrics registry with all collectors registered.
@@ -89,32 +83,6 @@ func NewRegistry() *Registry {
 			},
 			[]string{"type"},
 		),
-
-		// Database metrics
-		DBDomainsTotal: prometheus.NewGauge(
-			prometheus.GaugeOpts{
-				Name: "db_domains_total",
-				Help: "Total number of domains in the database",
-			},
-		),
-		DBIPsTotal: prometheus.NewGauge(
-			prometheus.GaugeOpts{
-				Name: "db_ips_total",
-				Help: "Total number of IP addresses in the database",
-			},
-		),
-		DBConnectionsOpen: prometheus.NewGauge(
-			prometheus.GaugeOpts{
-				Name: "db_connections_open",
-				Help: "Number of open database connections",
-			},
-		),
-		DBConnectionsIdle: prometheus.NewGauge(
-			prometheus.GaugeOpts{
-				Name: "db_connections_idle",
-				Help: "Number of idle database connections",
-			},
-		),
 	}
 
 	// Register all metrics
@@ -126,10 +94,6 @@ func NewRegistry() *Registry {
 		r.APIStatsQueries,
 		r.APIDomainsQueries,
 		r.APIExportTotal,
-		r.DBDomainsTotal,
-		r.DBIPsTotal,
-		r.DBConnectionsOpen,
-		r.DBConnectionsIdle,
 	)
 
 	return r

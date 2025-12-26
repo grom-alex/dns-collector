@@ -29,12 +29,8 @@ type Registry struct {
 	CleanupRuns         prometheus.Counter
 
 	// Database metrics
-	DBDomainsTotal     prometheus.Gauge
-	DBIPsTotal         prometheus.Gauge
-	DBConnectionsOpen  prometheus.Gauge
-	DBConnectionsIdle  prometheus.Gauge
-	DBQueriesTotal     *prometheus.CounterVec
-	DBQueryDuration    *prometheus.HistogramVec
+	DBDomainsTotal prometheus.Gauge
+	DBIPsTotal     prometheus.Gauge
 }
 
 // NewRegistry creates a new metrics registry with all collectors registered.
@@ -153,33 +149,6 @@ func NewRegistry() *Registry {
 				Help: "Total number of IP addresses in the database",
 			},
 		),
-		DBConnectionsOpen: prometheus.NewGauge(
-			prometheus.GaugeOpts{
-				Name: "dns_db_connections_open",
-				Help: "Number of open database connections",
-			},
-		),
-		DBConnectionsIdle: prometheus.NewGauge(
-			prometheus.GaugeOpts{
-				Name: "dns_db_connections_idle",
-				Help: "Number of idle database connections",
-			},
-		),
-		DBQueriesTotal: prometheus.NewCounterVec(
-			prometheus.CounterOpts{
-				Name: "dns_db_queries_total",
-				Help: "Total number of database queries",
-			},
-			[]string{"operation", "status"},
-		),
-		DBQueryDuration: prometheus.NewHistogramVec(
-			prometheus.HistogramOpts{
-				Name:    "dns_db_query_duration_seconds",
-				Help:    "Duration of database queries",
-				Buckets: []float64{0.0001, 0.0005, 0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1},
-			},
-			[]string{"operation"},
-		),
 	}
 
 	// Register all metrics
@@ -199,10 +168,6 @@ func NewRegistry() *Registry {
 		r.CleanupRuns,
 		r.DBDomainsTotal,
 		r.DBIPsTotal,
-		r.DBConnectionsOpen,
-		r.DBConnectionsIdle,
-		r.DBQueriesTotal,
-		r.DBQueryDuration,
 	)
 
 	return r
