@@ -2,8 +2,10 @@ package metrics
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log"
+	"net/http"
 	"time"
 
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
@@ -14,12 +16,13 @@ import (
 
 // InfluxDBConfig holds the configuration for InfluxDB client.
 type InfluxDBConfig struct {
-	Enabled         bool   `yaml:"enabled"`
-	URL             string `yaml:"url"`
-	Token           string `yaml:"token"`
-	Organization    string `yaml:"organization"`
-	Bucket          string `yaml:"bucket"`
-	IntervalSeconds int    `yaml:"interval_seconds"`
+	Enabled            bool   `yaml:"enabled"`
+	URL                string `yaml:"url"`
+	Token              string `yaml:"token"`
+	Organization       string `yaml:"organization"`
+	Bucket             string `yaml:"bucket"`
+	IntervalSeconds    int    `yaml:"interval_seconds"`
+	InsecureSkipVerify bool   `yaml:"insecure_skip_verify"`
 }
 
 // InfluxDBClient pushes metrics to InfluxDB periodically.
@@ -34,7 +37,19 @@ type InfluxDBClient struct {
 
 // NewInfluxDBClient creates a new InfluxDB client for pushing metrics.
 func NewInfluxDBClient(cfg InfluxDBConfig, registry *Registry) *InfluxDBClient {
-	client := influxdb2.NewClient(cfg.URL, cfg.Token)
+	opts := influxdb2.DefaultOptions()
+
+	if cfg.InsecureSkipVerify {
+		opts.SetHTTPClient(&http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: true,
+				},
+			},
+		})
+	}
+
+	client := influxdb2.NewClientWithOptions(cfg.URL, cfg.Token, opts)
 	writeAPI := client.WriteAPIBlocking(cfg.Organization, cfg.Bucket)
 
 	return &InfluxDBClient{

@@ -31,9 +31,9 @@ metrics:
   path: "/metrics"
   influxdb:
     enabled: false
-    url: "http://influxdb:8086"
+    url: "https://influxdb:8086"
     token: ""  # Set via INFLUXDB_TOKEN env var
     organization: "my-org"
     bucket: "dns-metrics"
     interval_seconds: 10
-    insecure_skip_verify: false
+    insecure_skip_verify: false  # Set to true for self-signed certificates

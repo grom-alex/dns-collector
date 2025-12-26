@@ -28,8 +28,9 @@ metrics:
   path: "/metrics"
   influxdb:
     enabled: false
-    url: "http://localhost:8086"
+    url: "https://localhost:8086"
     token: ""
     organization: "dev-org"
     bucket: "dns-metrics-dev"
     interval_seconds: 5
+    insecure_skip_verify: true  # Dev environment with self-signed cert

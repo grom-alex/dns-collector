@@ -2,8 +2,10 @@ package metrics
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log"
+	"net/http"
 	"time"
 
 	"dns-collector/internal/config"
@@ -26,7 +28,19 @@ type InfluxDBClient struct {
 
 // NewInfluxDBClient creates a new InfluxDB client for pushing metrics.
 func NewInfluxDBClient(cfg config.InfluxDBConfig, registry *Registry) *InfluxDBClient {
-	client := influxdb2.NewClient(cfg.URL, cfg.Token)
+	opts := influxdb2.DefaultOptions()
+
+	if cfg.InsecureSkipVerify {
+		opts.SetHTTPClient(&http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: true,
+				},
+			},
+		})
+	}
+
+	client := influxdb2.NewClientWithOptions(cfg.URL, cfg.Token, opts)
 	writeAPI := client.WriteAPIBlocking(cfg.Organization, cfg.Bucket)
 
 	return &InfluxDBClient{
