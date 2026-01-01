@@ -192,7 +192,9 @@ func (db *Database) InsertOrGetDomain(domain string, maxResolv int) (*Domain, bo
 }
 
 // GetDomainsToResolve returns domains that need to be resolved
-// In cyclic mode, domains that completed a cycle and cooldown has passed will be included
+// In cyclic mode, includes domains where resolv_count < max_resolv.
+// Note: With current cyclic reset logic (reset to 2/3), domains never reach max_resolv,
+// making the cooldown condition unreachable. The cooldown branch is preserved for compatibility.
 func (db *Database) GetDomainsToResolve(limit int, cyclicMode bool, cooldownMins int) ([]Domain, error) {
 	var query string
 	var args []interface{}
@@ -257,17 +259,19 @@ func (db *Database) InsertOrUpdateIP(domainID int64, ip, ipType string) error {
 }
 
 // UpdateDomainResolvStats updates resolv_count and last_resolv_time
-// In cyclic mode, resets resolv_count to 0 when it reaches max_resolv
+// In cyclic mode, resets resolv_count to ⌊max_resolv × 2/3⌋ when it reaches max_resolv - 1
+// This prevents domains from completing a full cycle and triggering cooldown logic
 func (db *Database) UpdateDomainResolvStats(domainID int64, cyclicMode bool) error {
 	now := time.Now()
 
 	var query string
 	if cyclicMode {
-		// Reset resolv_count to 0 when it reaches max_resolv - 1
-		// This allows the next cycle to start fresh
+		// Reset to ⌊max_resolv × 2/3⌋ when reaching max_resolv - 1
+		// This keeps domains in a partial cycle rather than full reset to 0
+		// Examples: max_resolv=10 → reset to 6, max_resolv=3 → reset to 2
 		query = `UPDATE domain
 			SET resolv_count = CASE
-				WHEN resolv_count >= max_resolv - 1 THEN 0
+				WHEN resolv_count >= max_resolv - 1 THEN CAST(max_resolv * 2.0 / 3.0 AS INTEGER)
 				ELSE resolv_count + 1
 			END,
 			last_resolv_time = $1

@@ -2,6 +2,48 @@
 
 All notable changes to DNS Collector will be documented in this file.
 
+## [2.8.0] - 2026-01-02
+
+### Changed
+- **Cyclic Resolving Reset Logic**: Modified domain resolution counter reset behavior
+  - When `cyclic_resolv: true` and domain reaches `resolv_count >= max_resolv - 1`
+  - **Old behavior**: Reset `resolv_count` to `0`
+  - **New behavior**: Reset `resolv_count` to `⌊max_resolv × 2/3⌋` (floor division)
+  - **Examples**:
+    - `max_resolv=10`: cycle becomes 6→7→8→9→6 (instead of 0→1→...→9→0)
+    - `max_resolv=3`: cycle becomes 2→3→2 (instead of 0→1→2→0)
+    - `max_resolv=1`: cycle becomes 0→1→0 (special case)
+  - **Impact**: Domains never complete full resolution cycles, keeping IP addresses more up-to-date
+  - **Note**: This makes the cooldown logic branch unreachable (preserved for compatibility)
+
+### Technical Details
+- Modified SQL query in `dns-collector/internal/database/database.go:UpdateDomainResolvStats()`
+- Formula: `CAST(max_resolv * 2.0 / 3.0 AS INTEGER)` for PostgreSQL floor rounding
+- Updated function comments to document the behavior change
+- Added 5 comprehensive unit tests with 13 test cases covering edge cases
+- All 70+ tests passing
+
+### Testing
+- New test: `TestUpdateDomainResolvStats_CyclicMode_Increment` - basic cyclic behavior
+- New test: `TestUpdateDomainResolvStats_CyclicMode_ResetCalculation` - 13 scenarios (max_resolv: 1-100)
+- New test: `TestUpdateDomainResolvStats_CyclicMode_QueryValidation` - SQL structure validation
+- New test: `TestUpdateDomainResolvStats_CyclicMode_EdgeCase_MaxResolv1` - edge case testing
+- New test: `TestUpdateDomainResolvStats_ModesComparison` - legacy vs cyclic comparison
+
+### Documentation
+- Updated [README.md](README.md) with "Режимы резолвинга" section
+- Added `cyclic_resolv` and `resolv_cooldown_mins` parameters to config example
+- Documented both cyclic and legacy modes with use cases
+
+### Migration
+- No configuration changes required (backward compatible)
+- No database schema changes
+- Existing domains will transition smoothly at next resolution
+
+### Docker Images
+- `registry.gromas.ru/apps/dns-collector/dns-collector:2.8.0`
+- `registry.gromas.ru/apps/dns-collector/web-api:2.8.0`
+
 ## [2.6.0] - 2025-12-26
 
 ### Added
