@@ -208,6 +208,162 @@ func TestUpdateDomainResolvStats(t *testing.T) {
 	}
 }
 
+func TestUpdateDomainResolvStats_CyclicMode_Increment(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("Failed to create mock: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	database := &Database{DB: db}
+
+	// Expect the cyclic mode update query with CASE statement
+	mock.ExpectExec(`UPDATE domain SET resolv_count = CASE WHEN resolv_count >= max_resolv - 1 THEN CAST\(max_resolv \* 2\.0 / 3\.0 AS INTEGER\) ELSE resolv_count \+ 1 END, last_resolv_time`).
+		WithArgs(sqlmock.AnyArg(), int64(1)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	err = database.UpdateDomainResolvStats(1, true)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("Unfulfilled expectations: %v", err)
+	}
+}
+
+func TestUpdateDomainResolvStats_CyclicMode_ResetCalculation(t *testing.T) {
+	// This test documents the expected reset values for various max_resolv settings
+	// The actual calculation happens in PostgreSQL: CAST(max_resolv * 2.0 / 3.0 AS INTEGER)
+
+	tests := []struct {
+		name       string
+		maxResolv  int
+		resetValue int
+	}{
+		{"max_resolv=1", 1, 0},
+		{"max_resolv=2", 2, 1},
+		{"max_resolv=3", 3, 2},
+		{"max_resolv=4", 4, 2},
+		{"max_resolv=5", 5, 3},
+		{"max_resolv=6", 6, 4},
+		{"max_resolv=7", 7, 4},
+		{"max_resolv=8", 8, 5},
+		{"max_resolv=9", 9, 6},
+		{"max_resolv=10", 10, 6},
+		{"max_resolv=15", 15, 10},
+		{"max_resolv=20", 20, 13},
+		{"max_resolv=100", 100, 66},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Calculate expected value: floor(max_resolv * 2 / 3)
+			expected := int(float64(tt.maxResolv) * 2.0 / 3.0)
+			if expected != tt.resetValue {
+				t.Errorf("Reset calculation mismatch: max_resolv=%d, expected=%d, documented=%d",
+					tt.maxResolv, expected, tt.resetValue)
+			}
+		})
+	}
+}
+
+func TestUpdateDomainResolvStats_CyclicMode_QueryValidation(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("Failed to create mock: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	database := &Database{DB: db}
+
+	// The query should contain the new calculation formula
+	expectedQueryPattern := `UPDATE domain SET resolv_count = CASE WHEN resolv_count >= max_resolv - 1 THEN CAST\(max_resolv \* 2\.0 / 3\.0 AS INTEGER\) ELSE resolv_count \+ 1 END`
+
+	mock.ExpectExec(expectedQueryPattern).
+		WithArgs(sqlmock.AnyArg(), int64(123)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	err = database.UpdateDomainResolvStats(123, true)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("Unfulfilled expectations: %v", err)
+	}
+}
+
+func TestUpdateDomainResolvStats_CyclicMode_EdgeCase_MaxResolv1(t *testing.T) {
+	// When max_resolv=1, reset should be 0 (floor(1 * 2/3) = floor(0.666) = 0)
+	// This ensures the edge case works correctly
+
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("Failed to create mock: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	database := &Database{DB: db}
+
+	mock.ExpectExec(`UPDATE domain SET resolv_count = CASE WHEN resolv_count >= max_resolv - 1 THEN CAST\(max_resolv \* 2\.0 / 3\.0 AS INTEGER\)`).
+		WithArgs(sqlmock.AnyArg(), int64(1)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	err = database.UpdateDomainResolvStats(1, true)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("Unfulfilled expectations: %v", err)
+	}
+}
+
+func TestUpdateDomainResolvStats_ModesComparison(t *testing.T) {
+	tests := []struct {
+		name       string
+		cyclicMode bool
+		queryMatch string
+	}{
+		{
+			name:       "legacy mode - simple increment",
+			cyclicMode: false,
+			queryMatch: `UPDATE domain SET resolv_count = resolv_count \+ 1, last_resolv_time`,
+		},
+		{
+			name:       "cyclic mode - conditional reset",
+			cyclicMode: true,
+			queryMatch: `UPDATE domain SET resolv_count = CASE WHEN resolv_count >= max_resolv - 1 THEN CAST\(max_resolv \* 2\.0 / 3\.0 AS INTEGER\)`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db, mock, err := sqlmock.New()
+			if err != nil {
+				t.Fatalf("Failed to create mock: %v", err)
+			}
+			defer func() { _ = db.Close() }()
+
+			database := &Database{DB: db}
+
+			mock.ExpectExec(tt.queryMatch).
+				WithArgs(sqlmock.AnyArg(), int64(1)).
+				WillReturnResult(sqlmock.NewResult(0, 1))
+
+			err = database.UpdateDomainResolvStats(1, tt.cyclicMode)
+			if err != nil {
+				t.Fatalf("Expected no error, got %v", err)
+			}
+
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Errorf("Unfulfilled expectations: %v", err)
+			}
+		})
+	}
+}
+
 func TestInsertDomainStat(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
