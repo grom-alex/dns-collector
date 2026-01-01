@@ -89,10 +89,12 @@ database:
   ssl_mode: "disable"   # Режим SSL (disable/require)
 
 resolver:
-  interval_seconds: 300  # Период резолвинга (5 минут)
-  max_resolv: 10        # Максимальное количество резолвингов для домена
-  timeout_seconds: 5    # Таймаут DNS запроса
-  workers: 5           # Количество параллельных воркеров
+  interval_seconds: 300   # Период резолвинга (5 минут)
+  max_resolv: 10         # Максимальное количество резолвингов для домена
+  timeout_seconds: 5     # Таймаут DNS запроса
+  workers: 5            # Количество параллельных воркеров
+  cyclic_resolv: true    # Циклический режим резолвинга (рекомендуется)
+  resolv_cooldown_mins: 240  # Cooldown между циклами (4 часа)
 
 logging:
   level: "info"  # Уровень логирования (debug, info, warn, error)
@@ -175,7 +177,21 @@ python3 test_client.py
    - Для каждого домена выполняется DNS запрос
    - Полученные IP адреса сохраняются в таблицу `ip`
    - Обновляется счетчик `resolv_count` и время `last_resolv_time`
-5. Резолвинг прекращается когда `resolv_count` достигает `max_resolv`
+
+### Режимы резолвинга
+
+**Циклический режим** (`cyclic_resolv: true`, рекомендуется):
+- При достижении `resolv_count >= max_resolv - 1` счетчик сбрасывается в `⌊max_resolv × 2/3⌋`
+- Домены продолжают резолвиться циклически, обновляя IP адреса
+- Примеры:
+  - `max_resolv=10`: цикл 6→7→8→9→6
+  - `max_resolv=3`: цикл 2→3→2
+- **Преимущество**: IP адреса всегда актуальны для активных доменов
+
+**Legacy режим** (`cyclic_resolv: false`):
+- Резолвинг прекращается когда `resolv_count` достигает `max_resolv`
+- Домен больше не резолвится
+- **Использование**: для ограничения нагрузки на DNS сервера
 
 ## Production Deployment
 
