@@ -1,7 +1,7 @@
 # Multi-stage build для минимального размера образа
 
 # Stage 1: Build
-FROM golang:1.24-bullseye AS builder
+FROM golang:1.24-bookworm AS builder
 
 # Установка необходимых пакетов для сборки
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -21,7 +21,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o dns-collector ./cmd/dns-collector
 
 # Stage 2: Runtime
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 
 # Установка runtime зависимостей
 RUN apt-get update && apt-get install -y --no-install-recommends \

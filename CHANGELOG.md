@@ -2,6 +2,12 @@
 
 All notable changes to DNS Collector will be documented in this file.
 
+## [Unreleased] - 2026-11-24
+
+### Fixed
+
+- Docker images moved from Debian bullseye to bookworm (`golang:1.24-bookworm`, `debian:bookworm-slim`): the bullseye-security repository started returning 404 for openssl/ca-certificates, breaking CI Docker builds.
+
 ## [2.8.0] - 2026-01-02
 
 ### Changed
