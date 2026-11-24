@@ -6,13 +6,13 @@
 
 ```bash
 # Сборка и запуск всех сервисов
-docker-compose up -d
+docker compose up -d
 
 # Просмотр логов
-docker-compose logs -f web-api
+docker compose logs -f web-api
 
 # Остановка сервисов
-docker-compose down
+docker compose down
 ```
 
 Web-интерфейс будет доступен по адресу: http://localhost:8080
@@ -21,7 +21,7 @@ Web-интерфейс будет доступен по адресу: http://loc
 
 ### Предварительные требования
 
-- Go 1.21+
+- Go 1.24+
 - Node.js 20+
 - npm или yarn
 
@@ -45,8 +45,12 @@ server:
   host: "0.0.0.0"
 
 database:
-  domains_db: "../data/domains.db"
-  stats_db: "../data/stats.db"
+  host: "localhost"
+  port: 5432
+  user: "dns_collector"
+  password: ""          # POSTGRES_PASSWORD
+  database: "dns_collector"
+  ssl_mode: "disable"
 
 logging:
   level: "debug"
@@ -89,12 +93,16 @@ cd web-api
 # Сборка образа
 docker build -t dns-collector-webapi:latest .
 
-# Запуск контейнера
+# Запуск контейнера (нужен доступ к PostgreSQL)
 docker run -d \
   -p 8080:8080 \
-  -v $(pwd)/../data:/app/data:ro \
+  -e POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
+  -e POSTGRES_SSL_MODE=disable \
   --name dns-collector-webapi \
   dns-collector-webapi:latest
+
+# В config/config.yaml database.host должен указывать на доступный PostgreSQL
+# (в compose-сети — "postgres", при запуске на хосте — "localhost").
 ```
 
 ## Проверка работоспособности
@@ -156,12 +164,14 @@ logging:
 ### Проверка доступа к БД
 
 ```bash
-# Проверка что БД доступны
-ls -la ../data/
+# PostgreSQL доступен
+pg_isready -h localhost -p 5432 -U dns_collector
 
 # Проверка содержимого
-sqlite3 ../data/domains.db "SELECT COUNT(*) FROM domain;"
-sqlite3 ../data/stats.db "SELECT COUNT(*) FROM domain_stat;"
+psql "postgres://dns_collector:$POSTGRES_PASSWORD@localhost:5432/dns_collector" \
+  -c "SELECT COUNT(*) FROM domain;"
+psql "postgres://dns_collector:$POSTGRES_PASSWORD@localhost:5432/dns_collector" \
+  -c "SELECT COUNT(*) FROM domain_stat;"
 ```
 
 ### Frontend отладка
@@ -181,17 +191,17 @@ API поддерживает пагинацию. Рекомендуемые зн
 
 ### Индексы БД
 
-Основной сервис dns-collector создает необходимые индексы:
-- `domain_stat.timestamp` - для быстрой фильтрации по дате
-- `domain_stat.domain` - для поиска по домену
-- `ip.domain_id` - для быстрого получения IP домена
+Схему и индексы создают миграции (общие с dns-collector):
+- `domain_stat.timestamp` — фильтрация по дате;
+- `domain_stat.domain`, `domain_stat.client_ip` — фильтры UI;
+- `ip.domain_id` — выборка IP домена;
+- `domain.domain` — уникальность и поиск.
+
+Список индексов и план их сокращения: [../docs/OPTIMIZATION_PLAN.md](../docs/OPTIMIZATION_PLAN.md#22-индексы-которые-убивают-hot).
 
 ## Безопасность
 
-Web API работает в read-only режиме с базами данных:
-- Открывает БД с флагом `?mode=ro`
-- Не может модифицировать данные
-- Безопасно для публичного доступа (с учетом CORS)
+Web API читает данные, но **не является read-only на уровне БД**: при старте он применяет миграции (DDL). Кроме того, **встроенной аутентификации нет** — сервис нельзя выставлять в интернет без reverse proxy с auth. CORS не заменяет аутентификацию.
 
 ### Настройка CORS
 
@@ -206,13 +216,12 @@ cors:
 
 ## Troubleshooting
 
-### Ошибка "database is locked"
+### Ошибка подключения к PostgreSQL
 
-Web API использует read-only режим, конфликтов быть не должно. Если ошибка возникает:
-
-1. Проверьте что основной сервис dns-collector использует WAL mode
-2. Убедитесь что volume монтирован корректно
-3. Проверьте права доступа к файлам БД
+1. Проверьте `database.host`: в Docker это `postgres`, локально — `localhost`.
+2. Проверьте `POSTGRES_PASSWORD`, `POSTGRES_SSL_MODE` и `pg_hba.conf`.
+3. Убедитесь, что PostgreSQL healthy: `docker compose ps`, `pg_isready`.
+4. Проверьте, что миграции не упали: `docker compose logs web-api`.
 
 ### Фронтенд не загружается
 
@@ -229,14 +238,15 @@ Web API использует read-only режим, конфликтов быть
 
 3. В Docker пересоберите образ:
    ```bash
-   docker-compose build web-api
+   docker compose build web-api
    ```
 
 ### API возвращает пустые данные
 
 1. Убедитесь что dns-collector работает и собирает данные
-2. Проверьте путь к БД в конфигурации
+2. Проверьте `database` в конфигурации (host/port/user/database).
 3. Проверьте содержимое БД:
    ```bash
-   sqlite3 data/stats.db "SELECT COUNT(*) FROM domain_stat;"
+   docker compose exec -T postgres psql -U dns_collector -d dns_collector \
+     -c "SELECT COUNT(*) FROM domain_stat;"
    ```

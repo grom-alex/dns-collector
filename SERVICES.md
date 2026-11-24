@@ -1,411 +1,283 @@
-# DNS Collector - Архитектура микросервисов
+# Архитектура микросервисов DNS Collector
 
 ## Обзор
 
-DNS Collector состоит из двух независимых микросервисов:
+Система состоит из двух Go-сервисов и PostgreSQL:
 
-1. **dns-collector** - основной сервис сбора и резолвинга DNS запросов
-2. **web-api** - веб-интерфейс для визуализации и анализа данных
+| Сервис | Роль | Порт |
+|---|---|---|
+| `dns-collector` | приём UDP, запись в БД, резолвинг, retention, метрики | 5353/udp, 9090/tcp |
+| `web-api` | REST API, Vue UI, Excel/pfSense-экспорт | 8080/tcp |
+| PostgreSQL 16 | общее хранилище | 5432/tcp |
 
-## Архитектура
+Оба сервиса — отдельные Go-модули (`dns-collector/go.mod`, `web-api/go.mod`) и отдельные Docker-образы. Общей библиотеки между ними нет: часть кода (миграции, метрики, структуры конфига) дублируется.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Docker Compose                          │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ┌──────────────────────┐         ┌────────────────────┐   │
-│  │   dns-collector      │         │     web-api        │   │
-│  │   (UDP Server +      │         │  (HTTP Server +    │   │
-│  │    DNS Resolver)     │         │   Vue.js UI)       │   │
-│  │                      │         │                    │   │
-│  │  Port: 5353/udp     │         │  Port: 8080/tcp    │   │
-│  └──────────┬───────────┘         └──────────┬─────────┘   │
-│             │                                 │             │
-│             │    ┌─────────────┐             │             │
-│             └───▶│    data/    │◀────────────┘             │
-│                  │             │                           │
-│                  │ domains.db  │  (shared volume, RO)     │
-│                  │  stats.db   │                           │
-│                  └─────────────┘                           │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
+## Схема
 
-## Сервис: dns-collector
+~~~text
+                 UDP JSON :5353
+┌──────────────┐ ───────────────▶ ┌─────────────────────────┐
+│ Unbound /    │                  │      dns-collector      │
+│ pfSense      │                  │ UDP + resolver + cleanup│
+└──────────────┘                  │ + Prometheus :9090      │
+                                  └───────────┬─────────────┘
+                                              │ SQL (read/write)
+                                              ▼
+                                  ┌─────────────────────────┐
+                                  │      PostgreSQL 16      │
+                                  │ domain / ip / domain_stat│
+                                  └───────────┬─────────────┘
+                                              │ SQL (read + migrations)
+                                              ▼
+                                  ┌─────────────────────────┐
+                                  │         web-api         │
+                                  │ Gin + Vue + Excel       │
+                                  │ HTTP :8080              │
+                                  └───────────┬─────────────┘
+                                              │ HTTP
+                                              ▼
+                                  ┌─────────────────────────┐
+                                  │ Браузер, API, pfSense   │
+                                  └─────────────────────────┘
+~~~
+
+## dns-collector
 
 ### Назначение
-Сбор DNS запросов от клиентов и периодический резолвинг доменов.
+
+Принимает DNS-события, пишет статистику и домены, периодически резолвит их в IPv4/IPv6, чистит устаревшие данные.
 
 ### Компоненты
-- **UDP Server** (port 5353): принимает JSON сообщения с DNS запросами
-- **DNS Resolver**: периодически резолвит домены в IP адреса
-- **SQLite БД**: хранит домены, IP адреса и статистику
 
-### Технологии
-- Go 1.21
-- SQLite3
-- UDP протокол
+- **UDP-сервер** — JSON-сообщения, валидация, запись.
+- **Резолвер** — пул воркеров, `LookupIP` для IPv4/IPv6.
+- **Cleanup** — retention статистики, IP и доменов.
+- **Метрики** — Prometheus + опционально InfluxDB 2.
+- **Миграции** — `golang-migrate` с embedded SQL.
+
+Подробно: [dns-collector/ARCHITECTURE.md](dns-collector/ARCHITECTURE.md).
 
 ### Конфигурация
-Файл: `config.yaml`
 
-```yaml
+`dns-collector/config/config.yaml`:
+
+~~~yaml
 server:
   udp_port: 5353
 
 database:
-  domains_db: "data/domains.db"
-  stats_db: "data/stats.db"
+  host: "postgres"
+  port: 5432
+  user: "dns_collector"
+  password: ""          # POSTGRES_PASSWORD
+  database: "dns_collector"
+  ssl_mode: "disable"
 
 resolver:
   interval_seconds: 300
   max_resolv: 10
   timeout_seconds: 5
   workers: 5
-```
+  cyclic_resolv: true
+  resolv_cooldown_mins: 240
+
+retention:
+  stats_days: 30
+  cleanup_interval_hours: 24
+  ip_ttl_days: 3
+  domain_ttl_days: 30
+
+metrics:
+  enabled: true
+  port: 9090
+  path: "/metrics"
+~~~
 
 ### Запуск
-```bash
-# Локально
-go run cmd/dns-collector/main.go -config config.yaml
 
+~~~bash
 # Docker
-docker run -p 5353:5353/udp \
-  -v $(pwd)/data:/app/data \
-  dns-collector:latest
-```
+docker compose up -d dns-collector
 
-### Документация
-- [README.md](README.md) - основная документация
-- [ARCHITECTURE.md](ARCHITECTURE.md) - архитектура сервиса
-- [INSTALL.md](INSTALL.md) - установка и настройка
+# Нативно
+cd dns-collector
+go run ./cmd/dns-collector -config config/config.yaml
+~~~
 
-## Сервис: web-api
+## web-api
 
 ### Назначение
-Веб-интерфейс для просмотра и анализа собранных DNS данных.
+
+Читает PostgreSQL, отдаёт REST API и SPA, формирует Excel и plain-text списки для pfSense.
 
 ### Компоненты
-- **REST API** (Go + Gin): обработка запросов к данным
-- **Web UI** (Vue.js): интерактивный интерфейс пользователя
-- **SQLite Reader**: read-only доступ к БД
 
-### Технологии
-**Backend:**
-- Go 1.21
-- Gin Web Framework
-- SQLite3 (read-only)
+- **Gin HTTP-сервер** — `/api/*`, `/health`, `/metrics`, статика SPA.
+- **Слой БД** — параметризованные запросы, regex-фильтры, bulk-выборка IP.
+- **Excel-экспорт** — `excelize`, до 100 000 строк.
+- **Export lists** — динамические эндпоинты из конфига.
 
-**Frontend:**
-- Vue.js 3
-- Vue Router
-- Axios
-- Vite
+### API
 
-### Возможности
+| Метод | Путь | Назначение |
+|---|---|---|
+| GET | `/health` | health-check (не проверяет БД) |
+| GET | `/api/stats` | статистика с фильтрами и пагинацией |
+| GET | `/api/stats/export` | Excel со статистикой |
+| GET | `/api/domains` | домены с фильтрами |
+| GET | `/api/domains/export` | Excel: домены + IP |
+| GET | `/api/domains/:id` | домен с IP |
+| GET | `/metrics` | Prometheus (если `metrics.enabled`) |
+| GET | `<endpoint>` из `export_lists` | plain-text список доменов/IP |
+| GET | `<excluded_ips_endpoint>` | аудит исключённых shared IP |
 
-#### 1. Статистика DNS запросов
-- Просмотр всех DNS запросов
-- Фильтрация по IP клиента (один или несколько)
-- Фильтрация по подсети (CIDR)
-- Фильтрация по диапазону дат
-- Сортировка по любому полю
-- Пагинация
+Параметры `/api/stats`: `client_ips`, `subnet`, `date_from`, `date_to`, `sort_by`, `sort_order`, `limit`, `offset`.
 
-#### 2. Просмотр доменов
-- Список всех доменов
-- Фильтрация по регулярным выражениям
-- Фильтрация по диапазону дат
-- Просмотр зарезолвленных IP для каждого домена
-- Разделение IPv4/IPv6
-- Сортировка и пагинация
-
-### API Endpoints
-
-```
-GET  /health              - Health check
-GET  /api/stats           - Статистика DNS запросов
-GET  /api/domains         - Список доменов
-GET  /api/domains/:id     - Детали домена с IP адресами
-```
+Параметры `/api/domains`: `domain_regex` (PostgreSQL regex), `date_from`, `date_to`, `sort_by`, `sort_order`, `limit`, `offset`.
 
 ### Конфигурация
-Файл: `web-api/config/config.yaml`
 
-```yaml
+`web-api/config/config.yaml`:
+
+~~~yaml
 server:
   port: 8080
   host: "0.0.0.0"
 
 database:
-  domains_db: "/app/data/domains.db"
-  stats_db: "/app/data/stats.db"
+  host: "postgres"
+  port: 5432
+  user: "dns_collector"
+  password: ""
+  database: "dns_collector"
+  ssl_mode: "disable"
 
 cors:
   allowed_origins:
     - "http://localhost:8080"
-```
+    - "http://localhost:5173"
+  allow_credentials: true
+
+metrics:
+  enabled: true
+  path: "/metrics"
+
+export_lists:
+  - name: "Example"
+    endpoint: "/export/example"
+    domain_regex: "^example\\.com$"
+    include_domains: true
+~~~
+
+Полное описание export lists: [web-api/EXPORT_LISTS.md](web-api/EXPORT_LISTS.md).
 
 ### Запуск
-```bash
-# Локально (backend)
-cd web-api
-go run cmd/main.go -config config/config.yaml
 
-# Локально (frontend dev-server)
+~~~bash
+# Docker
+docker compose up -d web-api
+
+# Backend локально
+cd web-api
+go run ./cmd -config config/config.yaml
+
+# Frontend dev-server
 cd web-api/frontend
 npm install
 npm run dev
+~~~
 
-# Docker
-docker build -t dns-collector-webapi ./web-api
-docker run -p 8080:8080 \
-  -v $(pwd)/data:/app/data:ro \
-  dns-collector-webapi:latest
-```
+## Общая база данных
 
-### Документация
-- [web-api/README.md](web-api/README.md) - описание API и возможностей
-- [web-api/INSTALL.md](web-api/INSTALL.md) - установка и отладка
+- **dns-collector**: read/write, создаёт схему и применяет миграции.
+- **web-api**: read + применяет те же миграции при старте; данные не изменяет (кроме схемы).
+- Оба сервиса ходят в одну БД; конфиги `database` должны совпадать.
+- Миграции дублируются в обоих репозиториях и должны быть идентичны.
 
-## Общие ресурсы
+Таблицы:
 
-### База данных
-
-Оба сервиса используют общие SQLite базы:
-
-**domains.db:**
-- `domain` - таблица доменов
-- `ip` - таблица IP адресов
-
-**stats.db:**
-- `domain_stat` - статистика DNS запросов
-
-### Разделение доступа
-- **dns-collector**: read-write доступ, создает и обновляет данные
-- **web-api**: read-only доступ, только читает данные
-
-### Volume mapping
-```yaml
-volumes:
-  - ./data:/app/data        # dns-collector (RW)
-  - ./data:/app/data:ro     # web-api (RO)
-```
+- `domain` — домены и состояние резолвинга;
+- `ip` — IP-адреса доменов;
+- `domain_stat` — статистика запросов.
 
 ## Запуск всей системы
 
-### Docker Compose (рекомендуется)
+~~~bash
+docker compose up -d
+docker compose ps
+docker compose logs -f
+~~~
 
-```bash
-# Запуск всех сервисов
-docker-compose up -d
+Порты:
 
-# Просмотр логов
-docker-compose logs -f
-
-# Остановка
-docker-compose down
-```
-
-### Порты
-- `5353/udp` - dns-collector UDP server
-- `8080/tcp` - web-api HTTP server
-
-### Проверка работы
-
-```bash
-# Health check dns-collector (через БД)
-sqlite3 data/domains.db "SELECT COUNT(*) FROM domain;"
-
-# Health check web-api
-curl http://localhost:8080/health
-
-# Отправка тестового запроса в dns-collector
-echo '{"client_ip":"192.168.1.10","domain":"google.com","qtype":"A","rtype":"dns"}' | \
-  nc -u -w1 localhost 5353
-
-# Просмотр статистики через web-api
-curl http://localhost:8080/api/stats?limit=5
-```
+- `5353/udp` — collector;
+- `8080/tcp` — web-api/UI;
+- `9090/tcp` — метрики collector (в production-compose);
+- `5432/tcp` — PostgreSQL (лучше не публиковать).
 
 ## Мониторинг
 
 ### Логи
 
-```bash
-# dns-collector
-docker logs -f dns-collector
-
-# web-api
-docker logs -f dns-collector-webapi
-```
+~~~bash
+docker compose logs -f dns-collector
+docker compose logs -f web-api
+~~~
 
 ### Метрики
 
-```bash
-# Количество доменов
-sqlite3 data/domains.db "SELECT COUNT(*) FROM domain;"
+- Collector: `http://localhost:9090/metrics`
+- web-api: `http://localhost:8080/metrics`
 
-# Количество запросов
-sqlite3 data/stats.db "SELECT COUNT(*) FROM domain_stat;"
+Основные группы:
 
-# Последние запросы
-sqlite3 data/stats.db \
-  "SELECT domain, client_ip, datetime(timestamp)
-   FROM domain_stat
-   ORDER BY timestamp DESC
-   LIMIT 10;"
-```
+- `dns_server_*` — UDP-приём;
+- `dns_resolver_*` — резолвинг;
+- `dns_cleanup_*` — retention;
+- `dns_db_*` — размеры БД;
+- `http_*`, `api_*` — web-api.
 
-### Health Checks
+### Проверка данных
 
-Docker Compose автоматически проверяет здоровье сервисов:
+~~~bash
+docker compose exec -T postgres psql -U dns_collector -d dns_collector -c "
+SELECT count(*) FROM domain;"
 
-```yaml
-# dns-collector
-healthcheck:
-  test: ["CMD", "sqlite3", "/app/data/domains.db", "SELECT 1;"]
-  interval: 30s
-
-# web-api
-healthcheck:
-  test: ["CMD", "wget", "--quiet", "--spider", "http://localhost:8080/health"]
-  interval: 30s
-```
+curl -s http://localhost:8080/health
+curl -s "http://localhost:8080/api/stats?limit=5"
+~~~
 
 ## Масштабирование
 
-### Вертикальное
-
-Увеличение ресурсов в `docker-compose.yml`:
-
-```yaml
-deploy:
-  resources:
-    limits:
-      cpus: '2.0'
-      memory: 1G
-```
-
-### Горизонтальное
-
-**dns-collector:**
-- Требует переход на централизованную БД (PostgreSQL)
-- Балансировщик для UDP трафика
-- Координация через distributed locks
-
-**web-api:**
-- Легко масштабируется (read-only)
-- Добавить nginx/haproxy для балансировки
-- Можно запустить несколько инстансов
-
-```bash
-docker-compose up -d --scale web-api=3
-```
+- **web-api** масштабируется горизонтально (read-only по данным): несколько инстансов за балансировщиком; миграции при старте должны быть идемпотентны.
+- **dns-collector** — один инстанс: резолвер не координируется между репликами, несколько экземпляров начнут дублировать резолвинг и запись.
+- Для роста приёма UDP можно разделить приём и резолвинг, но это отдельная архитектурная задача.
+- Узкое место сейчас — запись в PostgreSQL; см. [docs/OPTIMIZATION_PLAN.md](docs/OPTIMIZATION_PLAN.md).
 
 ## Безопасность
 
-### dns-collector
-- Валидация входящих данных
-- Ограничение размера UDP пакетов
-- Firewall для порта 5353
+- Аутентификации нет ни в API, ни в UI; ставьте за reverse proxy с auth.
+- UDP-приёмник не проверяет источник; ограничьте фаерволом.
+- Смените дефолтные пароли, не публикуйте PostgreSQL.
+- CORS настраивается в `web-api/config/config.yaml`.
+- Collector работает non-root; web-api — от root (см. план).
 
-### web-api
-- Read-only доступ к БД
-- CORS конфигурация
-- Rate limiting (через nginx/traefik)
+## Бэкап
 
-### Сеть
-```yaml
-# В docker-compose.yml можно добавить сеть
-networks:
-  dns-collector-net:
-    driver: bridge
-```
+~~~bash
+docker compose exec -T postgres \
+  pg_dump -U dns_collector -d dns_collector -Fc > dns_$(date +%F).dump
+~~~
 
-## Backup
+Восстановление — в [dns-collector/DOCKER.md](dns-collector/DOCKER.md#восстановление).
 
-### Автоматический backup БД
+## Документация
 
-```bash
-#!/bin/bash
-# backup.sh
-DATE=$(date +%Y%m%d_%H%M%S)
-cp data/domains.db backups/domains_${DATE}.db
-cp data/stats.db backups/stats_${DATE}.db
-```
-
-### Очистка старых данных
-
-```bash
-# Удаление статистики старше 30 дней
-sqlite3 data/stats.db \
-  "DELETE FROM domain_stat WHERE timestamp < datetime('now', '-30 days');"
-
-# Вакуумирование
-sqlite3 data/stats.db "VACUUM;"
-```
-
-## Обновление
-
-### dns-collector
-
-```bash
-docker pull registry.gromas.ru/apps/dns-collector:latest
-docker-compose up -d dns-collector
-```
-
-### web-api
-
-```bash
-cd web-api
-docker build -t dns-collector-webapi:latest .
-docker-compose up -d web-api
-```
-
-## Troubleshooting
-
-### dns-collector не получает запросы
-```bash
-# Проверка порта
-netstat -uln | grep 5353
-
-# Тест отправки
-echo '{"domain":"test.com"}' | nc -u -w1 localhost 5353
-
-# Логи
-docker logs dns-collector
-```
-
-### web-api показывает пустые данные
-```bash
-# Проверка БД
-ls -la data/
-sqlite3 data/stats.db "SELECT COUNT(*) FROM domain_stat;"
-
-# Проверка прав доступа
-docker exec dns-collector-webapi ls -la /app/data/
-
-# Логи
-docker logs dns-collector-webapi
-```
-
-### Проблемы производительности
-```bash
-# Размер БД
-du -h data/*.db
-
-# Количество записей
-sqlite3 data/stats.db "SELECT COUNT(*) FROM domain_stat;"
-
-# Очистка старых данных
-# См. раздел Backup выше
-```
-
-## Дополнительные материалы
-
-- [README.md](README.md) - общее описание проекта
-- [ARCHITECTURE.md](ARCHITECTURE.md) - подробная архитектура dns-collector
-- [web-api/README.md](web-api/README.md) - документация web-api
-- [queries.sql](queries.sql) - полезные SQL запросы
+- [README.md](README.md)
+- [SUMMARY.md](SUMMARY.md)
+- [QUICKSTART_WEBAPI.md](QUICKSTART_WEBAPI.md)
+- [dns-collector/ARCHITECTURE.md](dns-collector/ARCHITECTURE.md)
+- [dns-collector/QUICKSTART.md](dns-collector/QUICKSTART.md)
+- [dns-collector/DOCKER.md](dns-collector/DOCKER.md)
+- [web-api/README.md](web-api/README.md)
+- [docs/OPTIMIZATION_PLAN.md](docs/OPTIMIZATION_PLAN.md)

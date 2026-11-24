@@ -1,0 +1,222 @@
+@@@ 2026-11-23T00:14:54+06:00
+### diskstats
+   8       0 sda 65288 10376 4342542 26580 1658394 1395365 41931240 2848625 0 2518272 4516199 10954 0 43134152 775 190557 1640218
+   8       1 sda1 64874 10361 4329978 26541 1657274 1395364 41922280 2848223 0 2765904 2875540 10954 0 43134152 775 0 0
+   8       2 sda2 2 0 4 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+   8       5 sda5 257 15 6208 31 1119 1 8960 402 0 600064 434 0 0 0 0 0 0
+   8      16 sdb 51121636 6082 6914170130 4801442 92682725 1490927 1796210648 48183177 0 41410172 92243229 5469 0 107846832 295 21121126 39258314
+   8      17 sdb1 51121526 6082 6914166562 4801436 92682725 1490927 1796210648 48183177 0 45082956 52984910 5469 0 107846832 295 0 0
+   8      32 sdc 1602 105 56642 9030 189296 56315 7124760 3476226 0 3615812 5580513 6507 0 1023043008 465 46343 2094791
+  11       0 sr0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+   7       0 loop0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+   7       1 loop1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+   7       2 loop2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+   7       3 loop3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+   7       4 loop4 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+   7       5 loop5 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+   7       6 loop6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+   7       7 loop7 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+### dockerstats
+dns-collector-webapi|26.2MB / 0B|0.28%|23.43MiB / 512MiB
+dns-collector|10.1MB / 0B|0.26%|16.9MiB / 512MiB
+dns-collector-postgres|3.54TB / 910GB|0.26%|453.2MiB / 1GiB
+nexus-nginx|4.26MB / 4.1kB|0.00%|4.105MiB / 14.49GiB
+nexus|205MB / 4.09GB|0.13%|2.149GiB / 14.49GiB
+immich_server|221MB / 0B|0.04%|752.9MiB / 14.49GiB
+immich_postgres|3.17GB / 2.41GB|0.00%|3.117GiB / 14.49GiB
+immich_machine_learning|169MB / 0B|0.07%|262.2MiB / 14.49GiB
+immich_redis|15.4MB / 1.64GB|0.13%|15.82MiB / 14.49GiB
+serviio|263MB / 1.65GB|0.09%|356.4MiB / 14.49GiB
+portainer|40.1MB / 244MB|0.02%|27.05MiB / 14.49GiB
+### proc_io
+dns-collector-postgres|1445
+rchar: 4969618948452
+wchar: 491051773157
+syscr: 1022566569
+syscw: 33485232
+read_bytes: 3537203392512
+write_bytes: 490770112512
+cancelled_write_bytes: 413696
+dns-collector|1455
+rchar: 11563695492
+wchar: 19753546524
+syscr: 240319527
+syscw: 159370142
+read_bytes: 10145792
+write_bytes: 0
+cancelled_write_bytes: 0
+dns-collector-webapi|1431
+rchar: 1483465245
+wchar: 1965386733
+syscr: 10931969
+syscw: 4844487
+read_bytes: 17952768
+write_bytes: 0
+cancelled_write_bytes: 0
+### tables
+relname|n_tup_ins|n_tup_upd|n_tup_hot_upd|n_tup_del|n_dead_tup
+domain|8485|12706594|2679|8400|2700
+domain_stat|4718049|0|0|4597422|52270
+ip|532772|19037121|0|589609|62637
+schema_migrations|0|0|0|0|0
+(4 rows)
+### bgwriter
+checkpoints_timed|checkpoints_req|checkpoint_write_time|checkpoint_sync_time|buffers_checkpoint|buffers_clean|maxwritten_clean|buffers_backend|buffers_backend_fsync|buffers_alloc|stats_reset
+3192|4|861003170|122616|20702577|33420604|116365|13585271|0|39913366|2026-11-11 15:40:56.802653+00
+(1 row)
+### wal
+wal_records|wal_fpi|wal_bytes|wal_buffers_full|wal_write|wal_sync|wal_write_time|wal_sync_time|stats_reset
+481822628|60435133|235677969399|267746|22565681|22250801|0|0|2026-11-11 15:40:56.802653+00
+(1 row)
+### database
+datname|xact_commit|xact_rollback|tup_inserted|tup_updated|tup_deleted|blks_read|blks_hit
+dns_collector|95901657|404|5268958|31778077|5205083|584007166|7865338743
+postgres|0|0|0|0|0|0|0
+template0|0|0|0|0|0|0|0
+template1|0|0|0|0|0|0|0
+|0|0|0|0|0|78|63421684
+(5 rows)
+### io
+backend_type|object|context|reads|writes|writebacks|extends|fsyncs
+background writer|relation|normal||33420653|33420544||0
+checkpointer|relation|normal||20702581|20702570||158261
+autovacuum worker|relation|vacuum|541295119|10921378|0|0|
+client backend|relation|normal|36456013|2535755|0|1478|0
+background worker|relation|normal|486407|48177|0|0|0
+autovacuum worker|relation|normal|2385958|42024|0|207|0
+client backend|relation|bulkread|3184748|31253|0||
+startup|relation|normal|29|4717|0|0|0
+background worker|relation|bulkread|198996|201|0||
+standalone backend|relation|bulkread|0|0|0||
+standalone backend|relation|bulkwrite|0|0|0|0|
+standalone backend|relation|normal|0|0|0|0|0
+standalone backend|relation|vacuum|0|0|0|0|
+startup|relation|bulkread|0|0|0||
+startup|relation|bulkwrite|0|0|0|0|
+startup|relation|vacuum|0|0|0|0|
+walsender|relation|bulkread|0|0|0||
+walsender|relation|bulkwrite|0|0|0|0|
+walsender|relation|normal|0|0|0|0|0
+walsender|relation|vacuum|0|0|0|0|
+autovacuum launcher|relation|bulkread|0|0|0||
+walsender|temp relation|normal|0|0||0|
+autovacuum launcher|relation|normal|3|0|0||0
+autovacuum worker|relation|bulkread|0|0|0||
+client backend|relation|bulkwrite|0|0|0|0|
+client backend|relation|vacuum|0|0|0|0|
+client backend|temp relation|normal|0|0||0|
+background worker|relation|bulkwrite|0|0|0|0|
+background worker|relation|vacuum|0|0|0|0|
+background worker|temp relation|normal|0|0||0|
+(30 rows)
+@@@ 2026-11-23T00:15:57+06:00
+### diskstats
+   8       0 sda 65305 10376 4344102 26618 1658548 1395457 41934328 2848881 0 2518492 4516577 10954 0 43134152 775 190569 1640301
+   8       1 sda1 64891 10361 4331538 26580 1657428 1395456 41925368 2848479 0 2766144 2875834 10954 0 43134152 775 0 0
+   8       2 sda2 2 0 4 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+   8       5 sda5 257 15 6208 31 1119 1 8960 402 0 600064 434 0 0 0 0 0 0
+   8      16 sdb 51128216 6082 6915435434 4802105 92687793 1491026 1796295656 48185559 0 41412452 92248054 5469 0 107846832 295 21121797 39260093
+   8      17 sdb1 51128106 6082 6915431866 4802100 92687793 1491026 1796295656 48185559 0 45085504 52987956 5469 0 107846832 295 0 0
+   8      32 sdc 1602 105 56642 9030 189308 56318 7124944 3476481 0 3616060 5580890 6507 0 1023043008 465 46346 2094913
+  11       0 sr0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+   7       0 loop0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+   7       1 loop1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+   7       2 loop2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+   7       3 loop3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+   7       4 loop4 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+   7       5 loop5 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+   7       6 loop6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+   7       7 loop7 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+### dockerstats
+dns-collector-webapi|26.2MB / 0B|0.20%|23.25MiB / 512MiB
+dns-collector|10.1MB / 0B|0.44%|12.46MiB / 512MiB
+dns-collector-postgres|3.54TB / 910GB|12.49%|447.7MiB / 1GiB
+nexus-nginx|4.26MB / 4.1kB|0.00%|4.105MiB / 14.49GiB
+nexus|205MB / 4.09GB|0.14%|2.149GiB / 14.49GiB
+immich_server|221MB / 0B|0.03%|752.9MiB / 14.49GiB
+immich_postgres|3.17GB / 2.41GB|0.00%|3.117GiB / 14.49GiB
+immich_machine_learning|169MB / 0B|0.08%|262.2MiB / 14.49GiB
+immich_redis|15.4MB / 1.64GB|0.12%|15.82MiB / 14.49GiB
+serviio|263MB / 1.65GB|0.09%|356.4MiB / 14.49GiB
+portainer|40.1MB / 244MB|0.00%|27.05MiB / 14.49GiB
+### proc_io
+dns-collector-postgres|1445
+rchar: 4969662578258
+wchar: 491062602981
+syscr: 1022598107
+syscw: 33485817
+read_bytes: 3537209155584
+write_bytes: 490780942336
+cancelled_write_bytes: 413696
+dns-collector|1455
+rchar: 11564664136
+wchar: 19754826251
+syscr: 240337143
+syscw: 159380099
+read_bytes: 10145792
+write_bytes: 0
+cancelled_write_bytes: 0
+dns-collector-webapi|1431
+rchar: 1483574075
+wchar: 1965542933
+syscr: 10932806
+syscw: 4844865
+read_bytes: 17952768
+write_bytes: 0
+cancelled_write_bytes: 0
+### tables
+relname|n_tup_ins|n_tup_upd|n_tup_hot_upd|n_tup_del|n_dead_tup
+domain|8485|12707590|2679|8400|3696
+domain_stat|4718995|0|0|4597422|52270
+ip|532783|19037232|0|589609|62748
+schema_migrations|0|0|0|0|0
+(4 rows)
+### bgwriter
+checkpoints_timed|checkpoints_req|checkpoint_write_time|checkpoint_sync_time|buffers_checkpoint|buffers_clean|maxwritten_clean|buffers_backend|buffers_backend_fsync|buffers_alloc|stats_reset
+3192|4|861003170|122616|20703401|33423467|116367|13586641|0|39915225|2026-11-11 15:40:56.802653+00
+(1 row)
+### wal
+wal_records|wal_fpi|wal_bytes|wal_buffers_full|wal_write|wal_sync|wal_write_time|wal_sync_time|stats_reset
+481844861|60436380|235683838057|267746|22566339|22251456|0|0|2026-11-11 15:40:56.802653+00
+(1 row)
+### database
+datname|xact_commit|xact_rollback|tup_inserted|tup_updated|tup_deleted|blks_read|blks_hit
+dns_collector|95909750|404|5269915|31779184|5205083|584008533|7865547014
+postgres|0|0|0|0|0|0|0
+template0|0|0|0|0|0|0|0
+template1|0|0|0|0|0|0|0
+|0|0|0|0|0|78|63425420
+(5 rows)
+### io
+backend_type|object|context|reads|writes|writebacks|extends|fsyncs
+background writer|relation|normal||33423487|33423360||0
+checkpointer|relation|normal||20703404|20703402||158261
+autovacuum worker|relation|vacuum|541433909|10922748|0|0|
+client backend|relation|normal|36457382|2535755|0|1478|0
+background worker|relation|normal|486407|48177|0|0|0
+autovacuum worker|relation|normal|2386505|42024|0|207|0
+client backend|relation|bulkread|3184748|31253|0||
+startup|relation|normal|29|4717|0|0|0
+background worker|relation|bulkread|198996|201|0||
+standalone backend|relation|bulkread|0|0|0||
+standalone backend|relation|bulkwrite|0|0|0|0|
+standalone backend|relation|normal|0|0|0|0|0
+standalone backend|relation|vacuum|0|0|0|0|
+startup|relation|bulkread|0|0|0||
+startup|relation|bulkwrite|0|0|0|0|
+startup|relation|vacuum|0|0|0|0|
+walsender|relation|bulkread|0|0|0||
+walsender|relation|bulkwrite|0|0|0|0|
+walsender|relation|normal|0|0|0|0|0
+walsender|relation|vacuum|0|0|0|0|
+autovacuum launcher|relation|bulkread|0|0|0||
+walsender|temp relation|normal|0|0||0|
+autovacuum launcher|relation|normal|3|0|0||0
+autovacuum worker|relation|bulkread|0|0|0||
+client backend|relation|bulkwrite|0|0|0|0|
+client backend|relation|vacuum|0|0|0|0|
+client backend|temp relation|normal|0|0||0|
+background worker|relation|bulkwrite|0|0|0|0|
+background worker|relation|vacuum|0|0|0|0|
+background worker|temp relation|normal|0|0||0|
+(30 rows)

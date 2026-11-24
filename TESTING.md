@@ -1,180 +1,133 @@
-# Testing Guide
+# Тестирование проекта
 
-Этот документ описывает тестирование проекта DNS Collector.
+## Что и где лежит
 
-## Структура тестов
+| Пакет | Файлы | Что проверяет |
+|---|---|---|
+| `dns-collector/internal/config` | `config_test.go` | загрузка YAML, env-overrides, defaults, валидация |
+| `dns-collector/internal/database` | `database_test.go` | SQL-конструкции и часть сценариев (sqlmock) |
+| `dns-collector/internal/server` | `udp_test.go` | JSON-парсинг, `trimInvalidJSONSuffix`, структуры |
+| `dns-collector/internal/resolver` | `resolver_test.go` | конфигурация, CNAME, часть SQL |
+| `dns-collector/internal/cleanup` | `cleanup_test.go` | сервис cleanup |
+| `dns-collector/internal/metrics` | `*_test.go` | реестр, InfluxDB, DB-коллектор |
+| `web-api/internal/handlers` | `handlers_test.go` | HTTP handlers через mock `database.DB` |
+| `web-api/internal/database` | `database_test.go` | валидация regex, без реальной БД |
+| `web-api/internal/excel` | `exporter_test.go` | генерация XLSX, стили, большие выборки |
+| `web-api/internal/utils` | `ip_parser_test.go` | парсинг IP из файла |
+| `web-api/cmd` | `main_test.go` | загрузка/валидация конфига |
 
-### dns-collector
-- `internal/config/config_test.go` - Тесты конфигурации (9 тестов)
-  - Загрузка и валидация YAML конфигурации
-  - Переопределение через переменные окружения
-  - Проверка значений по умолчанию
-  - Обработка ошибок
+## Запуск
 
-### web-api
-- `internal/handlers/handlers_test.go` - Тесты HTTP handlers (7 тестов)
-  - Health check endpoint
-  - Statistics API с фильтрацией и пагинацией
-  - Domain API с валидацией
-  - Обработка ошибок базы данных
-- `internal/database/interface.go` - Интерфейс для моков в тестах
+### Корневой Makefile
 
-## Запуск тестов
-
-### Используя Makefile (рекомендуется)
-
-```bash
-# Запустить все тесты
-make test
-
-# Запустить тесты только dns-collector
+~~~bash
+make test                 # оба сервиса
 make test-dns-collector
-
-# Запустить тесты только web-api
 make test-web-api
-
-# Запустить тесты с детальным выводом
-make test-verbose
-
-# Запустить тесты с coverage
 make test-coverage
-```
+make test-verbose
+~~~
 
-### Напрямую через go test
+### Напрямую
 
-```bash
-# dns-collector тесты
+~~~bash
+# dns-collector
 cd dns-collector
-go test ./internal/... ./cmd/... -v
+go test ./internal/... ./cmd/...
+go test -race ./internal/...
+go test -cover ./internal/...
 
-# web-api тесты
+# web-api
 cd web-api
-go test ./internal/... ./cmd/... -v
+go test ./internal/... ./cmd/...
+go test -race ./internal/...
+go test -cover ./internal/... ./cmd/...
+~~~
 
-# С coverage
-go test ./internal/... ./cmd/... -coverprofile=coverage.out
-go tool cover -html=coverage.out
-```
+### CI
 
-## Coverage отчеты
+Процесс ветвления, PR и релиза — [CONTRIBUTING.md](CONTRIBUTING.md).
 
-После выполнения `make test-coverage` HTML отчеты доступны:
-- `dns-collector/coverage.html`
-- `web-api/coverage.html`
+`.github/workflows/test.yml` запускает:
 
-## CI/CD
+- `go test -v -race -coverprofile ...` для обоих сервисов;
+- `golangci-lint`;
+- Codecov.
 
-GitHub Actions автоматически запускает тесты при:
-- Push в ветки `main`, `develop`, `feature/*`
-- Pull requests в `main` и `develop`
+`.github/workflows/build.yml` дополнительно собирает Docker-образы, но содержит `continue-on-error: true` для тестов и версию Go 1.21, что расходится с `go.mod` (1.24). Это исправляется в [плане](docs/OPTIMIZATION_PLAN.md#этап-9-тесты-ci-наблюдаемость-34-дня).
 
-Workflow выполняет:
-1. **Тесты** с race detector и coverage
-2. **Линтинг** через golangci-lint
-3. **Сборку** обоих сервисов
+## Покрытие (замер 2026-11-22)
 
-Результаты coverage автоматически отправляются в Codecov.
+| Пакет | Покрытие |
+|---|---:|
+| collector/config | 91,8% |
+| collector/database | 42,5% |
+| collector/metrics | 64,2% |
+| collector/cleanup | 2,1% |
+| collector/resolver | 7,1% |
+| collector/server | 8,7% |
+| web-api/utils | 94,1% |
+| web-api/excel | 75,8% |
+| web-api/handlers | 39,9% |
+| web-api/metrics | 39,8% |
+| web-api/cmd | 31,6% |
+| web-api/database | 2,6% |
 
-## Написание новых тестов
+Все тесты проходят, в том числе `-race`. Низкое покрытие — не потому, что тестов нет, а потому что они проверяют конфиги/парсинг, а не реальные SQL и бизнес-логику.
 
-### Структура теста
+## Известные пробелы
 
-```go
-func TestFeatureName(t *testing.T) {
-    // Setup
+- `handleMessage` в `udp.go` не тестируется: сервер принимает конкретный `*database.Database`, а не интерфейс.
+- `runResolution`, `resolveDomain`, `ApplyResolution` (после рефакторинга) не покрыты.
+- SQL-запросы в `web-api/internal/database` проверяются только на валидацию regex; реальные запросы не выполняются.
+- Моки в `resolver_test.go` и `udp_test.go` объявлены, но не используются (`_ = mockDB`) и имеют устаревшие сигнатуры.
+- Frontend (Vue) не имеет тестов и линтера.
+- `web-api/Makefile` вызывает `npm run test`, которого нет в `package.json`.
+- Нет нагрузочных тестов на поток UDP и экспорт 100 тыс. строк.
 
-    // Execute
+## Как писать тесты
 
-    // Assert
-    if got != want {
-        t.Errorf("got %v, want %v", got, want)
-    }
-}
-```
+### Table-driven
 
-### Table-driven тесты
-
-```go
-func TestMultipleCases(t *testing.T) {
+~~~go
+func TestFeature(t *testing.T) {
     tests := []struct {
         name string
-        input string
+        in   string
         want string
     }{
-        {"case 1", "input1", "output1"},
-        {"case 2", "input2", "output2"},
+        {"case 1", "in1", "out1"},
     }
-
     for _, tt := range tests {
         t.Run(tt.name, func(t *testing.T) {
-            got := processInput(tt.input)
-            if got != tt.want {
-                t.Errorf("got %v, want %v", got, tt.want)
+            if got := Feature(tt.in); got != tt.want {
+                t.Fatalf("got %q, want %q", got, tt.want)
             }
         })
     }
 }
-```
+~~~
 
-### Mock database
+### Моки
 
-```go
-type MockDatabase struct {
-    GetDataFunc func(id int) (Data, error)
-}
+Моки должны реализовывать интерфейс и использоваться в тесте, а не объявляться «для вида». Для web-api уже есть `database.DB`; для collector интерфейс нужно ввести (план, QUA-1).
 
-func (m *MockDatabase) GetData(id int) (Data, error) {
-    if m.GetDataFunc != nil {
-        return m.GetDataFunc(id)
-    }
-    return Data{}, nil
-}
-```
+### SQL
 
-## Лучшие практики
+- `DATA-DOG/go-sqlmock` — для проверки запросов и ошибок без БД.
+- Testcontainers/PostgreSQL — для интеграционных тестов схемы, upsert и партиций (план, QUA-2).
 
-1. **Используйте t.Helper()** для вспомогательных функций
-2. **Не забывайте t.Parallel()** для параллельных тестов
-3. **Используйте table-driven подход** для множественных сценариев
-4. **Моки** должны реализовывать интерфейсы
-5. **Cleanup** через `t.Cleanup()` или `defer`
-6. **Временные файлы** через `t.TempDir()`
+### Временные файлы
 
-## Статистика тестов
-
-```
-dns-collector:
-  - config: 9 тестов, 100% coverage
-
-web-api:
-  - handlers: 7 тестов, полное покрытие endpoints
-
-Общее время выполнения: ~10-20ms
-```
+`t.TempDir()`, `t.Cleanup()`, `t.Helper()`.
 
 ## Troubleshooting
 
-### Тесты не запускаются
-
-```bash
-# Проверьте зависимости
-go mod download
-go mod tidy
-
-# Очистите кэш
+~~~bash
 go clean -testcache
-```
+go mod download
+~~~
 
-### Race detector warnings
-
-```bash
-# Запустите с race detector
-go test -race ./...
-```
-
-### Coverage не генерируется
-
-```bash
-# Убедитесь что указаны правильные пакеты
-go test ./internal/... ./cmd/... -coverprofile=coverage.out
-```
+- `operation not permitted` в `GOCACHE` — задайте `GOCACHE=$PWD/.gocache`.
+- `race detector` требует `-race` и может замедлить тесты.
+- Если тест зависит от сети/DNS — используйте `httptest`/fake resolver, а не реальный DNS.

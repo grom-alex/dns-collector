@@ -1,0 +1,97 @@
+=== info ===
+dealloc|stats_reset
+0|2026-11-22 18:35:41.850501+00
+(1 row)
+=== top by calls ===
+calls|total_ms|mean_ms|rows|query
+2576|608.1|0.24|2576|INSERT INTO ip (domain_id, ip, type, time)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT(domain_id, ip) DO UPDATE SET
+			time = $5,
+			type = $6
+995|130.9|0.13|995|UPDATE domain
+			SET resolv_count = CASE
+				WHEN resolv_count >= max_resolv - $3 THEN CAST(max_resolv * $4 / $5 AS INTEGER)
+				ELSE resolv
+82|27.0|0.33|82|UPDATE domain SET last_seen = $1 WHERE id = $2
+82|2.6|0.03|82|SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen
+			FROM domain WHERE domain = $1
+82|40.9|0.50|0|INSERT INTO domain (domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen)
+		VALUES ($1, $2, $6, $3, $4, $5)
+		ON CONFL
+82|15.0|0.18|82|INSERT INTO domain_stat (domain, client_ip, rtype, timestamp)
+		VALUES ($1, $2, $3, $4)
+3|18.2|6.06|3|SELECT COUNT(*) FROM domain
+3|104.4|34.80|3|SELECT COUNT(*) FROM ip
+2|0.0|0.02|2|SELECT * FROM pg_stat_statements_info
+1|0.1|0.05|1|SELECT pg_stat_statements_reset()
+1|0.1|0.14|2|SELECT datname, count(*) FROM pg_stat_activity GROUP BY datname ORDER BY count(*) DESC
+1|1.8|1.80|1000|SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen
+			FROM domain
+			WHERE resolv_count < max_resolv
+			 
+1|0.1|0.06|1|SELECT count(*) AS rows, sum(calls) AS calls FROM pg_stat_statements
+(13 rows)
+=== top by total_exec_time ===
+calls|total_ms|mean_ms|rows|query
+2576|608.1|0.24|2576|INSERT INTO ip (domain_id, ip, type, time)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT(domain_id, ip) DO UPDATE SET
+			time = $5,
+			type = $6
+995|130.9|0.13|995|UPDATE domain
+			SET resolv_count = CASE
+				WHEN resolv_count >= max_resolv - $3 THEN CAST(max_resolv * $4 / $5 AS INTEGER)
+				ELSE resolv
+3|104.4|34.80|3|SELECT COUNT(*) FROM ip
+82|40.9|0.50|0|INSERT INTO domain (domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen)
+		VALUES ($1, $2, $6, $3, $4, $5)
+		ON CONFL
+82|27.0|0.33|82|UPDATE domain SET last_seen = $1 WHERE id = $2
+3|18.2|6.06|3|SELECT COUNT(*) FROM domain
+82|15.0|0.18|82|INSERT INTO domain_stat (domain, client_ip, rtype, timestamp)
+		VALUES ($1, $2, $3, $4)
+82|2.6|0.03|82|SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen
+			FROM domain WHERE domain = $1
+1|1.8|1.80|1000|SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen
+			FROM domain
+			WHERE resolv_count < max_resolv
+			 
+1|0.1|0.14|2|SELECT datname, count(*) FROM pg_stat_activity GROUP BY datname ORDER BY count(*) DESC
+1|0.1|0.13|13|SELECT calls, round(total_exec_time::numeric,$1) AS total_ms, round(mean_exec_time::numeric,$2) AS mean_ms, rows, left(query,$3) AS query FR
+1|0.1|0.06|1|SELECT count(*) AS rows, sum(calls) AS calls FROM pg_stat_statements
+1|0.1|0.05|1|SELECT pg_stat_statements_reset()
+2|0.0|0.02|2|SELECT * FROM pg_stat_statements_info
+(14 rows)
+=== top by wal_bytes ===
+calls|wal_bytes|total_ms|query
+2576|29422670|608.1|INSERT INTO ip (domain_id, ip, type, time)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT(domain_id, ip) DO UPDATE SET
+			time = $5,
+			type = $6
+995|4440403|130.9|UPDATE domain
+			SET resolv_count = CASE
+				WHEN resolv_count >= max_resolv - $3 THEN CAST(max_resolv * $4 / $5 AS INTEGER)
+				ELSE resolv
+82|806088|27.0|UPDATE domain SET last_seen = $1 WHERE id = $2
+82|345189|15.0|INSERT INTO domain_stat (domain, client_ip, rtype, timestamp)
+		VALUES ($1, $2, $3, $4)
+3|8463|18.2|SELECT COUNT(*) FROM domain
+82|425|40.9|INSERT INTO domain (domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen)
+		VALUES ($1, $2, $6, $3, $4, $5)
+		ON CONFL
+82|57|2.6|SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen
+			FROM domain WHERE domain = $1
+1|0|0.1|SELECT pg_stat_statements_reset()
+3|0|104.4|SELECT COUNT(*) FROM ip
+1|0|0.1|SELECT calls, round(total_exec_time::numeric,$1) AS total_ms, round(mean_exec_time::numeric,$2) AS mean_ms, rows, left(query,$3) AS query FR
+1|0|0.1|SELECT datname, count(*) FROM pg_stat_activity GROUP BY datname ORDER BY count(*) DESC
+2|0|0.0|SELECT * FROM pg_stat_statements_info
+1|0|0.1|SELECT calls, round(total_exec_time::numeric,$1) AS total_ms, round(mean_exec_time::numeric,$2) AS mean_ms, rows, left(query,$3) AS query FR
+1|0|0.1|SELECT count(*) AS rows, sum(calls) AS calls FROM pg_stat_statements
+1|0|1.8|SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen
+			FROM domain
+			WHERE resolv_count < max_resolv
+			 
+(15 rows)

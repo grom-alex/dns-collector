@@ -1,394 +1,215 @@
-# DNS Collector - Быстрый старт
+# Быстрый старт dns-collector
 
-## 🚀 Запуск за 5 минут
+## 1. Docker Compose (рекомендуется)
 
-### Вариант 1: С помощью Docker (рекомендуется)
+Из **корня** репозитория:
 
-```bash
-# 1. Перейти в директорию
-cd /home/test/projects/dns-collector
+~~~bash
+docker compose up -d
+docker compose ps
+docker compose logs -f dns-collector
+~~~
 
-# 2. Создать директорию для данных
-mkdir -p data
+Поднимаются три сервиса:
 
-# 3. Запустить
-docker-compose up -d
+| Сервис | Порт | Назначение |
+|---|---|---|
+| `postgres` | 5432 | PostgreSQL 16 |
+| `dns-collector` | 5353/udp | приём DNS-событий и резолвинг |
+| `web-api` | 8080 | REST API и веб-интерфейс |
 
-# 4. Проверить логи
-docker-compose logs -f
-```
+Веб-интерфейс: `http://localhost:8080`.
 
-**Готово!** Сервер слушает на порту 5353 UDP.
+> В корневом `docker-compose.yml` порт метрик 9090 не публикуется. Для доступа к `/metrics` используйте production-конфигурацию или добавьте публикацию порта.
 
----
+## 2. Отправка тестового запроса
 
-### Вариант 2: Нативная сборка
+~~~bash
+echo '{"client_ip":"192.168.1.10","domain":"example.com","qtype":"A","rtype":"dns"}' \
+  | nc -u -w1 localhost 5353
+~~~
 
-```bash
-# 1. Перейти в директорию
-cd /home/test/projects/dns-collector
+Или Python-клиентом:
 
-# 2. Установить зависимости
+~~~bash
+python3 test_client.py
+~~~
+
+Через секунду проверьте данные:
+
+~~~bash
+docker compose exec -T postgres psql -U dns_collector -d dns_collector -c "
+SELECT domain, client_ip, rtype, timestamp
+FROM domain_stat
+ORDER BY timestamp DESC
+LIMIT 5;"
+~~~
+
+## 3. Проверка резолвинга
+
+Первый батч резолвера запускается сразу при старте, далее — по `interval_seconds` (в dev-конфиге 10 с, в production — 300 с).
+
+~~~bash
+docker compose exec -T postgres psql -U dns_collector -d dns_collector -c "
+SELECT d.domain, i.ip, i.type, i.time
+FROM domain d
+JOIN ip i ON i.domain_id = d.id
+WHERE d.domain = 'example.com';"
+~~~
+
+Если IP ещё нет — подождите батч и проверьте логи:
+
+~~~bash
+docker compose logs -f dns-collector | grep -i resolve
+~~~
+
+## 4. Нативная сборка
+
+Требования: Go 1.24+, PostgreSQL 16 (локально или в Docker), доступ к DNS.
+
+~~~bash
+# 1. Зависимости
+cd dns-collector
 go mod download
 
-# 3. Собрать
+# 2. PostgreSQL (пример через Docker)
+docker run -d --name dns-pg \
+  -e POSTGRES_USER=dns_collector \
+  -e POSTGRES_PASSWORD=dns_collector_pass \
+  -e POSTGRES_DB=dns_collector \
+  -p 5432:5432 postgres:16-alpine
+
+# 3. Конфиг: host=localhost, пароль из env
+export POSTGRES_PASSWORD=dns_collector_pass
+
+# 4. Сборка и запуск
 make build
+./build/dns-collector -config config/config.yaml
+~~~
 
-# 4. Запустить
-./build/dns-collector
-```
+Миграции применяются автоматически при старте. Если БД недоступна или миграция падает — процесс завершается с ошибкой.
 
----
+## 5. Конфигурация
 
-## 📤 Отправка тестовых данных
+Основные параметры `config/config.yaml`:
 
-### Способ 1: Python скрипт
-
-```bash
-python3 test_client.py
-```
-
-### Способ 2: Вручную через netcat
-
-```bash
-echo '{"client_ip": "192.168.0.10", "domain": "google.com", "qtype": "A", "rtype": "dns"}' | nc -u -w1 localhost 5353
-```
-
-### Способ 3: Отправка нескольких доменов
-
-```bash
-# Создайте скрипт
-cat > send_domains.sh << 'EOF'
-#!/bin/bash
-for domain in google.com github.com amazon.com cloudflare.com; do
-    echo "{\"client_ip\": \"192.168.0.10\", \"domain\": \"$domain\", \"qtype\": \"A\", \"rtype\": \"dns\"}" | nc -u -w1 localhost 5353
-    sleep 0.1
-done
-EOF
-
-chmod +x send_domains.sh
-./send_domains.sh
-```
-
----
-
-## 📊 Проверка работы
-
-### Мониторинг
-
-```bash
-# Полная статистика
-./monitor.sh
-
-# Или вручную
-sqlite3 domains.db "SELECT COUNT(*) as total_domains FROM domain;"
-sqlite3 stats.db "SELECT COUNT(*) as total_requests FROM domain_stat;"
-```
-
-### Просмотр доменов
-
-```bash
-sqlite3 domains.db "SELECT domain, resolv_count, max_resolv FROM domain LIMIT 10;"
-```
-
-### Просмотр IP адресов
-
-```bash
-sqlite3 domains.db "
-SELECT d.domain, i.ip, i.type
-FROM domain d
-JOIN ip i ON d.id = i.domain_id
-LIMIT 20;
-"
-```
-
-### Просмотр статистики
-
-```bash
-sqlite3 stats.db "
-SELECT domain, COUNT(*) as count
-FROM domain_stat
-GROUP BY domain
-ORDER BY count DESC
-LIMIT 10;
-"
-```
-
----
-
-## ⚙️ Настройка
-
-Отредактируйте `config.yaml`:
-
-```yaml
+~~~yaml
 server:
-  udp_port: 5353              # Измените порт если нужно
+  udp_port: 5353
+
+database:
+  host: "postgres"      # для нативной сборки — localhost
+  port: 5432
+  user: "dns_collector"
+  password: ""          # POSTGRES_PASSWORD
+  database: "dns_collector"
+  ssl_mode: "disable"
 
 resolver:
-  interval_seconds: 300       # Как часто резолвить (в секундах)
-  max_resolv: 10             # Сколько раз резолвить каждый домен
-  workers: 5                 # Количество параллельных воркеров
-```
+  interval_seconds: 300
+  max_resolv: 10
+  timeout_seconds: 5
+  workers: 5
+  cyclic_resolv: true
 
-После изменения конфигурации перезапустите:
+retention:
+  stats_days: 30
+  cleanup_interval_hours: 24
+  ip_ttl_days: 3
+  domain_ttl_days: 30   # 0 = не удалять домены по TTL
+~~~
 
-```bash
-# Docker
-docker-compose restart
+После изменения конфига:
 
-# Нативно
-# Ctrl+C для остановки, затем
-./build/dns-collector
-```
+~~~bash
+docker compose restart dns-collector
+# или перезапустить нативный процесс
+~~~
 
----
+## 6. Просмотр данных
 
-## 🔍 Диагностика
+Все запросы выполняются через `psql`:
 
-### Проверка что сервер запущен
+~~~bash
+docker compose exec -T postgres psql -U dns_collector -d dns_collector
+~~~
 
-```bash
-# Проверка процесса
-ps aux | grep dns-collector
+Полезные запросы:
 
-# Проверка порта
-sudo netstat -ulnp | grep 5353
+~~~sql
+-- Сколько доменов и IP
+SELECT (SELECT count(*) FROM domain) AS domains,
+       (SELECT count(*) FROM ip) AS ips;
 
-# Или с помощью ss
-sudo ss -ulnp | grep 5353
-```
-
-### Проверка логов
-
-```bash
-# Docker
-docker-compose logs dns-collector
-
-# systemd (если запущен как сервис)
-sudo journalctl -u dns-collector -f
-```
-
-### Проверка баз данных
-
-```bash
-# Проверка существования
-ls -lh *.db
-
-# Проверка структуры
-sqlite3 domains.db ".schema"
-sqlite3 stats.db ".schema"
-```
-
----
-
-## 🛠️ Частые команды
-
-### Сборка и запуск
-
-```bash
-make build          # Собрать
-make run            # Собрать и запустить
-make clean          # Удалить build артефакты и БД
-make test           # Запустить тестовый клиент
-```
-
-### Docker команды
-
-```bash
-docker-compose up -d              # Запустить в фоне
-docker-compose logs -f            # Смотреть логи
-docker-compose ps                 # Статус
-docker-compose restart            # Перезапустить
-docker-compose down               # Остановить и удалить
-docker-compose down -v            # Остановить и удалить с volumes
-```
-
-### Работа с БД
-
-```bash
-# Открыть интерактивную консоль SQLite
-sqlite3 domains.db
-
-# Выполнить запрос
-sqlite3 domains.db "SELECT * FROM domain LIMIT 5;"
-
-# Экспорт в CSV
-sqlite3 -csv -header domains.db "SELECT * FROM domain;" > domains.csv
-
-# Backup
-sqlite3 domains.db ".backup domains_backup.db"
-```
-
----
-
-## 📋 Полезные SQL запросы
-
-```bash
-# Топ 10 доменов по количеству IP
-sqlite3 domains.db "
-SELECT d.domain, COUNT(i.id) as ip_count
-FROM domain d
-LEFT JOIN ip i ON d.id = i.domain_id
-GROUP BY d.id
-ORDER BY ip_count DESC
-LIMIT 10;
-"
-
-# Домены которые нужно еще резолвить
-sqlite3 domains.db "
-SELECT domain, resolv_count, max_resolv
-FROM domain
-WHERE resolv_count < max_resolv
-LIMIT 10;
-"
-
-# Статистика за последние 24 часа
-sqlite3 stats.db "
-SELECT COUNT(*) as requests
+-- Топ-10 доменов по числу запросов за сутки
+SELECT domain, count(*) AS requests
 FROM domain_stat
-WHERE timestamp >= datetime('now', '-24 hours');
-"
-
-# Топ клиентов
-sqlite3 stats.db "
-SELECT client_ip, COUNT(*) as requests
-FROM domain_stat
-GROUP BY client_ip
+WHERE timestamp >= now() - interval '24 hours'
+GROUP BY domain
 ORDER BY requests DESC
 LIMIT 10;
-"
-```
 
-Больше запросов в файле [queries.sql](queries.sql).
+-- Домены, ожидающие резолва
+SELECT domain, resolv_count, max_resolv, last_resolv_time
+FROM domain
+WHERE resolv_count < max_resolv
+ORDER BY last_resolv_time
+LIMIT 20;
 
----
+-- IP конкретного домена
+SELECT d.domain, i.ip, i.type
+FROM domain d
+JOIN ip i ON i.domain_id = d.id
+WHERE d.domain = 'example.com';
+~~~
 
-## 🔄 Обновление
+Больше запросов — в [queries.sql](queries.sql).
 
-```bash
-# Docker
-docker-compose down
-docker-compose build
-docker-compose up -d
+## 7. Диагностика
 
-# Нативно
-make clean
-make build
-```
+~~~bash
+# Процесс и порт
+ps aux | grep dns-collector
+sudo ss -ulnp | grep 5353
 
----
+# Логи
+docker compose logs -f dns-collector
+sudo journalctl -u dns-collector -f   # если systemd
 
-## 🗑️ Очистка
-
-### Удаление данных
-
-```bash
-# Удалить базы данных
-rm -f *.db
-
-# Удалить build артефакты
-make clean
-
-# Docker: удалить контейнеры и volumes
-docker-compose down -v
-```
-
-### Очистка старых записей статистики
-
-```bash
-# Удалить записи старше 30 дней
-sqlite3 stats.db "DELETE FROM domain_stat WHERE timestamp < datetime('now', '-30 days');"
-
-# Оптимизация БД
-sqlite3 stats.db "VACUUM;"
-```
-
----
-
-## 📚 Дополнительная информация
-
-- Подробная документация: [README.md](README.md)
-- Установка: [INSTALL.md](INSTALL.md)
-- Docker: [DOCKER.md](DOCKER.md)
-- Архитектура: [ARCHITECTURE.md](ARCHITECTURE.md)
-- Обзор: [SUMMARY.md](SUMMARY.md)
-
----
-
-## ❓ Проблемы?
+# Проверка БД
+docker compose exec -T postgres psql -U dns_collector -d dns_collector -c "SELECT 1;"
+~~~
 
 ### Порт занят
 
-```bash
-# Найти процесс использующий порт
+~~~bash
 sudo lsof -i :5353
-
-# Или изменить порт в config.yaml
-server:
-  udp_port: 5454  # Другой порт
-```
-
-### База данных заблокирована
-
-```bash
-# Убедитесь что запущен только один экземпляр
-ps aux | grep dns-collector
-
-# Убейте дубликаты если есть
-killall dns-collector
-```
+# измените server.udp_port в config.yaml
+~~~
 
 ### DNS не резолвится
 
-```bash
-# Проверьте DNS сервер системы
-cat /etc/resolv.conf
+- Проверьте `/etc/resolv.conf` внутри контейнера/хоста.
+- Увеличьте `resolver.timeout_seconds`.
+- Проверьте, что домен вообще есть в `domain` и у него `resolv_count < max_resolv`.
+- Помните: IPv4 и IPv6 используют один контекст таймаута; при медленном IPv4 IPv6 может не успеть.
 
-# Проверьте интернет соединение
-ping -c 3 8.8.8.8
+### Нет данных в web-api
 
-# Увеличьте таймаут в config.yaml
-resolver:
-  timeout_seconds: 10
-```
+- Убедитесь, что `dns-collector` пишет в ту же БД (`database` в обоих конфигах).
+- Проверьте `domain_stat` напрямую.
+- Проверьте `docker compose logs web-api`.
 
----
+## 8. Остановка и очистка
 
-## 🎯 Быстрый тест всей цепочки
+~~~bash
+docker compose down          # остановить, данные сохранить
+docker compose down -v       # остановить и удалить volume PostgreSQL
+~~~
 
-```bash
-# 1. Запустить сервер (в отдельном терминале)
-./build/dns-collector
+## 9. Что дальше
 
-# 2. Отправить тестовый запрос
-echo '{"client_ip": "192.168.0.10", "domain": "google.com", "qtype": "A", "rtype": "dns"}' | nc -u -w1 localhost 5353
-
-# 3. Подождать несколько секунд
-
-# 4. Проверить что домен добавлен
-sqlite3 domains.db "SELECT * FROM domain WHERE domain='google.com';"
-
-# 5. Проверить статистику
-sqlite3 stats.db "SELECT * FROM domain_stat WHERE domain='google.com';"
-
-# 6. Подождать время резолвинга (по умолчанию 5 минут, или измените interval_seconds)
-
-# 7. Проверить что IP адреса получены
-sqlite3 domains.db "
-SELECT d.domain, i.ip, i.type
-FROM domain d
-JOIN ip i ON d.id = i.domain_id
-WHERE d.domain='google.com';
-"
-```
-
----
-
-**Совет**: Для ускорения тестирования измените `interval_seconds` на `10` в config.yaml, тогда резолвинг будет происходить каждые 10 секунд.
-
-```yaml
-resolver:
-  interval_seconds: 10  # Для тестирования
-```
-
-Не забудьте вернуть нормальное значение для продакшена!
+- [ARCHITECTURE.md](ARCHITECTURE.md) — как устроены компоненты и схема.
+- [INSTALL.md](INSTALL.md) — нативная установка, systemd, обновление.
+- [DOCKER.md](DOCKER.md) — Docker, бэкапы, метрики.
+- [../docs/OPTIMIZATION_PLAN.md](../docs/OPTIMIZATION_PLAN.md) — план снижения нагрузки на диск.

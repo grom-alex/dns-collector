@@ -1,246 +1,189 @@
--- Полезные SQL запросы для анализа данных DNS Collector
+-- Полезные SQL-запросы для DNS Collector (PostgreSQL)
+-- Запуск:
+--   docker compose exec -T postgres psql -U dns_collector -d dns_collector -f - < queries.sql
+-- или:
+--   psql "$DATABASE_URL" -f queries.sql
+
+\pset pager off
 
 -- =====================================================
--- Запросы к domains.db
+-- Домены и IP
 -- =====================================================
 
--- 1. Показать все домены с информацией о резолвинге
+-- 1. Все домены с состоянием резолвинга
 SELECT
     id,
     domain,
-    datetime(time_insert) as inserted,
+    time_insert,
     resolv_count,
     max_resolv,
-    datetime(last_resolv_time) as last_resolved
+    last_resolv_time,
+    last_seen
 FROM domain
-ORDER BY last_resolv_time DESC;
+ORDER BY last_resolv_time DESC
+LIMIT 100;
 
--- 2. Показать домены, которые еще нужно резолвить
+-- 2. Домены, ожидающие резолва
 SELECT
     domain,
     resolv_count,
     max_resolv,
-    (max_resolv - resolv_count) as remaining_resolves
+    (max_resolv - resolv_count) AS remaining,
+    last_resolv_time
 FROM domain
 WHERE resolv_count < max_resolv
-ORDER BY last_resolv_time ASC;
+ORDER BY last_resolv_time ASC
+LIMIT 100;
 
--- 3. Показать все IP адреса для конкретного домена
+-- 3. IP-адреса конкретного домена
 SELECT
     d.domain,
     i.ip,
     i.type,
-    datetime(i.time) as resolved_at
+    i.time AS resolved_at
 FROM domain d
-JOIN ip i ON d.id = i.domain_id
-WHERE d.domain = 'google.com'
+JOIN ip i ON i.domain_id = d.id
+WHERE d.domain = 'example.com'
 ORDER BY i.type, i.ip;
 
--- 4. Показать топ доменов по количеству IP адресов
+-- 4. Топ-20 доменов по количеству IP
 SELECT
     d.domain,
-    COUNT(i.id) as ip_count,
-    GROUP_CONCAT(i.ip, ', ') as ip_addresses
+    COUNT(i.id) AS ip_count,
+    string_agg(i.ip, ', ' ORDER BY i.ip) AS ip_addresses
 FROM domain d
-LEFT JOIN ip i ON d.id = i.domain_id
-GROUP BY d.id
+LEFT JOIN ip i ON i.domain_id = d.id
+GROUP BY d.id, d.domain
 ORDER BY ip_count DESC
 LIMIT 20;
 
--- 5. Показать домены с IPv4 и IPv6 адресами
+-- 5. Домены с IPv4 и IPv6
 SELECT
     d.domain,
-    SUM(CASE WHEN i.type = 'ipv4' THEN 1 ELSE 0 END) as ipv4_count,
-    SUM(CASE WHEN i.type = 'ipv6' THEN 1 ELSE 0 END) as ipv6_count
+    COUNT(*) FILTER (WHERE i.type = 'ipv4') AS ipv4_count,
+    COUNT(*) FILTER (WHERE i.type = 'ipv6') AS ipv6_count
 FROM domain d
-LEFT JOIN ip i ON d.id = i.domain_id
-GROUP BY d.id
-HAVING ipv4_count > 0 OR ipv6_count > 0
-ORDER BY (ipv4_count + ipv6_count) DESC;
-
--- 6. Показать недавно добавленные домены
-SELECT
-    domain,
-    datetime(time_insert) as added_at,
-    resolv_count
-FROM domain
-ORDER BY time_insert DESC
+JOIN ip i ON i.domain_id = d.id
+GROUP BY d.id, d.domain
+HAVING COUNT(*) FILTER (WHERE i.type = 'ipv4') > 0
+   AND COUNT(*) FILTER (WHERE i.type = 'ipv6') > 0
+ORDER BY (COUNT(*)) DESC
 LIMIT 50;
 
--- 7. Показать все IP адреса с их доменами
-SELECT
-    i.ip,
-    i.type,
-    d.domain,
-    datetime(i.time) as last_updated
-FROM ip i
-JOIN domain d ON i.domain_id = d.id
-ORDER BY i.time DESC;
-
--- 8. Статистика по типам IP адресов
-SELECT
-    type,
-    COUNT(*) as count,
-    COUNT(DISTINCT domain_id) as unique_domains
-FROM ip
-GROUP BY type;
-
--- 9. Домены, которые достигли максимального количества резолвингов
-SELECT
-    domain,
-    resolv_count,
-    max_resolv,
-    datetime(last_resolv_time) as last_resolved
+-- 6. Домены, которые давно не запрашивали
+SELECT domain, last_seen, resolv_count
 FROM domain
-WHERE resolv_count >= max_resolv
-ORDER BY last_resolv_time DESC;
-
--- 10. Общая статистика по базе
-SELECT
-    (SELECT COUNT(*) FROM domain) as total_domains,
-    (SELECT COUNT(*) FROM ip) as total_ips,
-    (SELECT COUNT(*) FROM domain WHERE resolv_count >= max_resolv) as fully_resolved,
-    (SELECT COUNT(*) FROM domain WHERE resolv_count < max_resolv) as pending_resolution;
-
-
--- =====================================================
--- Запросы к stats.db
--- =====================================================
-
--- 11. Показать последние запросы
-SELECT
-    id,
-    domain,
-    client_ip,
-    rtype,
-    datetime(timestamp) as requested_at
-FROM domain_stat
-ORDER BY timestamp DESC
+WHERE last_seen IS NOT NULL
+  AND last_seen < now() - interval '30 days'
+ORDER BY last_seen
 LIMIT 100;
 
--- 12. Топ доменов по количеству запросов
-SELECT
-    domain,
-    COUNT(*) as request_count,
-    COUNT(DISTINCT client_ip) as unique_clients
+-- =====================================================
+-- Статистика запросов
+-- =====================================================
+
+-- 7. Запросы за последние 24 часа
+SELECT COUNT(*) AS requests
 FROM domain_stat
+WHERE timestamp >= now() - interval '24 hours';
+
+-- 8. Уникальные клиенты за сутки
+SELECT COUNT(DISTINCT client_ip) AS clients
+FROM domain_stat
+WHERE timestamp >= now() - interval '24 hours';
+
+-- 9. Топ-20 доменов за сутки
+SELECT domain, COUNT(*) AS requests
+FROM domain_stat
+WHERE timestamp >= now() - interval '24 hours'
 GROUP BY domain
-ORDER BY request_count DESC
+ORDER BY requests DESC
 LIMIT 20;
 
--- 13. Топ клиентов по количеству запросов
-SELECT
-    client_ip,
-    COUNT(*) as request_count,
-    COUNT(DISTINCT domain) as unique_domains
+-- 10. Топ-20 клиентов за сутки
+SELECT client_ip, COUNT(*) AS requests, COUNT(DISTINCT domain) AS domains
 FROM domain_stat
+WHERE timestamp >= now() - interval '24 hours'
 GROUP BY client_ip
-ORDER BY request_count DESC
+ORDER BY requests DESC
 LIMIT 20;
 
--- 14. Статистика по типам резолвинга (cache vs dns)
+-- 11. Распределение по rtype
 SELECT
     rtype,
-    COUNT(*) as count,
-    ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM domain_stat), 2) as percentage
+    COUNT(*) AS requests,
+    round(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 2) AS pct
 FROM domain_stat
+WHERE timestamp >= now() - interval '24 hours'
 GROUP BY rtype
-ORDER BY count DESC;
+ORDER BY requests DESC;
 
--- 15. Активность по часам
+-- 12. Активность по часам за сутки
 SELECT
-    strftime('%Y-%m-%d %H:00', timestamp) as hour,
-    COUNT(*) as request_count
+    date_trunc('hour', timestamp) AS hour,
+    COUNT(*) AS requests,
+    COUNT(DISTINCT client_ip) AS clients
 FROM domain_stat
+WHERE timestamp >= now() - interval '24 hours'
 GROUP BY hour
-ORDER BY hour DESC
-LIMIT 24;
+ORDER BY hour;
 
--- 16. Активность по дням
-SELECT
-    DATE(timestamp) as day,
-    COUNT(*) as request_count,
-    COUNT(DISTINCT domain) as unique_domains,
-    COUNT(DISTINCT client_ip) as unique_clients
+-- 13. Домены, запрошенные более чем с 10 клиентов
+SELECT domain, COUNT(DISTINCT client_ip) AS clients
 FROM domain_stat
-GROUP BY day
-ORDER BY day DESC
-LIMIT 30;
-
--- 17. Поиск запросов конкретного клиента
-SELECT
-    domain,
-    rtype,
-    datetime(timestamp) as requested_at
-FROM domain_stat
-WHERE client_ip = '192.168.0.10'
-ORDER BY timestamp DESC;
-
--- 18. Домены, запрашиваемые несколькими клиентами
-SELECT
-    domain,
-    COUNT(DISTINCT client_ip) as client_count,
-    COUNT(*) as total_requests
-FROM domain_stat
+WHERE timestamp >= now() - interval '7 days'
 GROUP BY domain
-HAVING client_count > 1
-ORDER BY client_count DESC;
+HAVING COUNT(DISTINCT client_ip) > 10
+ORDER BY clients DESC
+LIMIT 50;
 
--- 19. Статистика за последний час
-SELECT
-    COUNT(*) as requests_last_hour,
-    COUNT(DISTINCT domain) as unique_domains,
-    COUNT(DISTINCT client_ip) as unique_clients
+-- =====================================================
+-- Retention / обслуживание
+-- =====================================================
+
+-- 14. Сколько строк попадает под retention (не удалять вручную!)
+SELECT COUNT(*) AS rows_to_delete
 FROM domain_stat
-WHERE timestamp >= datetime('now', '-1 hour');
+WHERE timestamp < now() - interval '30 days';
 
--- 20. Статистика за последние 24 часа
+-- 15. Размеры таблиц
 SELECT
-    COUNT(*) as requests_last_24h,
-    COUNT(DISTINCT domain) as unique_domains,
-    COUNT(DISTINCT client_ip) as unique_clients
-FROM domain_stat
-WHERE timestamp >= datetime('now', '-24 hours');
+    relname,
+    pg_size_pretty(pg_total_relation_size(relid)) AS total,
+    pg_size_pretty(pg_relation_size(relid)) AS heap
+FROM pg_stat_user_tables
+ORDER BY pg_total_relation_size(relid) DESC;
 
-
--- =====================================================
--- Комбинированные запросы (требуют подключения обеих БД)
--- =====================================================
-
--- Для выполнения комбинированных запросов используйте:
--- sqlite3 domains.db
--- sqlite> ATTACH DATABASE 'stats.db' AS stats;
-
--- 21. Сравнение данных: домены в основной БД vs статистике
--- (выполняется в domains.db после ATTACH)
-/*
-ATTACH DATABASE 'stats.db' AS stats;
-
+-- 16. Dead tuples и autovacuum
 SELECT
-    d.domain,
-    d.resolv_count,
-    COUNT(i.id) as ip_count,
-    COALESCE(s.stat_count, 0) as request_count
-FROM domain d
-LEFT JOIN ip i ON d.id = i.domain_id
-LEFT JOIN (
-    SELECT domain, COUNT(*) as stat_count
-    FROM stats.domain_stat
-    GROUP BY domain
-) s ON d.domain = s.domain
-GROUP BY d.id
-ORDER BY request_count DESC;
-*/
+    relname,
+    n_live_tup,
+    n_dead_tup,
+    last_vacuum,
+    last_autovacuum,
+    autovacuum_count
+FROM pg_stat_user_tables
+ORDER BY n_dead_tup DESC;
 
--- =====================================================
--- Служебные запросы
--- =====================================================
+-- 17. HOT-обновления (ключевая метрика после оптимизации)
+SELECT
+    relname,
+    n_tup_upd,
+    n_tup_hot_upd,
+    round(100.0 * n_tup_hot_upd / NULLIF(n_tup_upd, 0), 1) AS hot_pct
+FROM pg_stat_user_tables
+WHERE n_tup_upd > 0
+ORDER BY n_tup_upd DESC;
 
--- Очистка старых записей статистики (старше 30 дней)
--- DELETE FROM domain_stat WHERE timestamp < datetime('now', '-30 days');
+-- 18. Буферы и checkpoints
+SELECT * FROM pg_stat_bgwriter;
 
--- Вакуумирование базы для освобождения места
--- VACUUM;
-
--- Проверка размера баз данных
--- .databases
+-- 19. Крупнейшие индексы
+SELECT
+    relname,
+    indexrelname,
+    idx_scan,
+    pg_size_pretty(pg_relation_size(indexrelid)) AS size
+FROM pg_stat_user_indexes
+ORDER BY pg_relation_size(indexrelid) DESC
+LIMIT 20;

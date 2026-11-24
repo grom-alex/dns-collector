@@ -1,0 +1,108 @@
+@@@ 2026-11-23T00:17:37+06:00
+### diskstats
+   8       0 sda 67338 10378 4813334 28173 1659087 1395623 41942616 2849358 0 2520212 4518773 10954 0 43134152 775 190587 1640466
+   8       1 sda1 66924 10363 4800770 28134 1657967 1395622 41933656 2848955 0 2767940 2877865 10954 0 43134152 775 0 0
+   8      16 sdb 51133639 6082 6916279450 4802656 92698042 1491189 1796451032 48190880 0 41417108 92258295 5469 0 107846832 295 21124242 39264462
+   8      17 sdb1 51133529 6082 6916275882 4802650 92698042 1491189 1796451032 48190880 0 45090536 52993826 5469 0 107846832 295 0 0
+### tables
+relname|n_tup_ins|n_tup_upd|n_tup_hot_upd|n_tup_del
+domain|8485|12708701|2679|8400
+domain_stat|4719106|0|0|4597422
+ip|532893|19039453|0|589609
+schema_migrations|0|0|0|0
+(4 rows)
+### bgwriter
+checkpoints_timed|checkpoints_req|checkpoint_write_time|checkpoint_sync_time|buffers_checkpoint|buffers_clean|buffers_backend|buffers_alloc
+3192|4|861273170|122642|20704059|33426867|13586683|39918709
+(1 row)
+### wal
+wal_records|wal_fpi|wal_bytes|wal_buffers_full|wal_write|wal_sync
+481894851|60439590|235695912163|267746|22568839|22253954
+(1 row)
+### io
+backend_type|object|context|writes|writebacks|reads
+background writer|relation|normal|33426867|33426752|
+checkpointer|relation|normal|20704057|20704059|
+autovacuum worker|relation|vacuum|10922748|0|541447655
+client backend|relation|normal|2535797|0|36460847
+background worker|relation|normal|48177|0|486407
+autovacuum worker|relation|normal|42024|0|2386510
+client backend|relation|bulkread|31253|0|3184748
+startup|relation|normal|4717|0|29
+background worker|relation|bulkread|201|0|198996
+standalone backend|relation|bulkread|0|0|0
+standalone backend|relation|bulkwrite|0|0|0
+standalone backend|relation|normal|0|0|0
+standalone backend|relation|vacuum|0|0|0
+startup|relation|bulkread|0|0|0
+startup|relation|bulkwrite|0|0|0
+startup|relation|vacuum|0|0|0
+walsender|relation|bulkread|0|0|0
+walsender|relation|bulkwrite|0|0|0
+walsender|relation|normal|0|0|0
+walsender|relation|vacuum|0|0|0
+autovacuum launcher|relation|bulkread|0|0|0
+walsender|temp relation|normal|0||0
+autovacuum launcher|relation|normal|0|0|3
+autovacuum worker|relation|bulkread|0|0|0
+client backend|relation|bulkwrite|0|0|0
+client backend|relation|vacuum|0|0|0
+client backend|temp relation|normal|0||0
+background worker|relation|bulkwrite|0|0|0
+background worker|relation|vacuum|0|0|0
+background worker|temp relation|normal|0||0
+(30 rows)
+@@@ 2026-11-23T00:22:37+06:00
+### diskstats
+   8       0 sda 67560 10413 4824998 28354 1660155 1396118 41961616 2850636 0 2521332 4520767 10954 0 43134152 775 190652 1641001
+   8       1 sda1 67144 10398 4812418 28314 1659031 1396117 41952624 2850233 0 2769064 2879323 10954 0 43134152 775 0 0
+   8      16 sdb 51146356 6082 6918400218 4803956 92723633 1491650 1796949944 48206017 0 41430424 92287134 5469 0 107846832 295 21130408 39276863
+   8      17 sdb1 51146246 6082 6918396650 4803951 92723633 1491650 1796949944 48206017 0 45104780 53010264 5469 0 107846832 295 0 0
+### tables
+relname|n_tup_ins|n_tup_upd|n_tup_hot_upd|n_tup_del
+domain|8489|12712063|2679|8401
+domain_stat|4720469|0|0|4597422
+ip|533056|19044309|0|589609
+schema_migrations|0|0|0|0
+(4 rows)
+### bgwriter
+checkpoints_timed|checkpoints_req|checkpoint_write_time|checkpoint_sync_time|buffers_checkpoint|buffers_clean|buffers_backend|buffers_alloc
+3193|4|861543012|122664|20711920|33433990|13588597|39927606
+(1 row)
+### wal
+wal_records|wal_fpi|wal_bytes|wal_buffers_full|wal_write|wal_sync
+482016252|60454736|235759257921|267746|22574901|22260003
+(1 row)
+### io
+backend_type|object|context|writes|writebacks|reads
+background writer|relation|normal|33433990|33433856|
+checkpointer|relation|normal|20711918|20711920|
+autovacuum worker|relation|vacuum|10924240|0|541613636
+client backend|relation|normal|2536219|0|36469039
+background worker|relation|normal|48177|0|486407
+autovacuum worker|relation|normal|42024|0|2387104
+client backend|relation|bulkread|31253|0|3184748
+startup|relation|normal|4717|0|29
+background worker|relation|bulkread|201|0|198996
+standalone backend|relation|bulkread|0|0|0
+standalone backend|relation|bulkwrite|0|0|0
+standalone backend|relation|normal|0|0|0
+standalone backend|relation|vacuum|0|0|0
+startup|relation|bulkread|0|0|0
+startup|relation|bulkwrite|0|0|0
+startup|relation|vacuum|0|0|0
+walsender|relation|bulkread|0|0|0
+walsender|relation|bulkwrite|0|0|0
+walsender|relation|normal|0|0|0
+walsender|relation|vacuum|0|0|0
+autovacuum launcher|relation|bulkread|0|0|0
+walsender|temp relation|normal|0||0
+autovacuum launcher|relation|normal|0|0|3
+autovacuum worker|relation|bulkread|0|0|0
+client backend|relation|bulkwrite|0|0|0
+client backend|relation|vacuum|0|0|0
+client backend|temp relation|normal|0||0
+background worker|relation|bulkwrite|0|0|0
+background worker|relation|vacuum|0|0|0
+background worker|temp relation|normal|0||0
+(30 rows)

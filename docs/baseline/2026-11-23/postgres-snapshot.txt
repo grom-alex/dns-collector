@@ -1,0 +1,163 @@
+### captured_at 2026-11-23T00:18:10+06:00
+version
+PostgreSQL 16.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit
+(1 row)
+pg_postmaster_start_time|uptime|pg_is_in_recovery
+2026-11-12 10:42:45.53386+00|10 days 07:35:24.795462|f
+(1 row)
+db|db_size|wal_size
+dns_collector|7755 MB|192 MB
+(1 row)
+name|setting|unit
+archive_mode|off|
+autovacuum_analyze_scale_factor|0.1|
+autovacuum_max_workers|3|
+autovacuum_naptime|60|s
+autovacuum_vacuum_cost_limit|-1|
+autovacuum_vacuum_scale_factor|0.2|
+bgwriter_delay|200|ms
+bgwriter_lru_maxpages|100|
+checkpoint_completion_target|0.9|
+checkpoint_timeout|300|s
+effective_cache_size|65536|8kB
+effective_io_concurrency|1|
+full_page_writes|on|
+jit|on|
+maintenance_work_mem|131072|kB
+max_connections|100|
+max_wal_size|1024|MB
+min_wal_size|80|MB
+random_page_cost|1.1|
+shared_buffers|16384|8kB
+shared_preload_libraries||
+synchronous_commit|on|
+track_io_timing|off|
+wal_buffers|512|8kB
+wal_compression|off|
+wal_level|replica|
+work_mem|16384|kB
+(27 rows)
+relname|n_live_tup|n_dead_tup|n_mod_since_analyze|n_tup_ins|n_tup_upd|n_tup_hot_upd|n_tup_del|autovacuum_count|vacuum_count|analyze_count|last_vacuum|last_autovacuum|last_analyze|last_autoanalyze
+domain|16279|1154|1141|8485|12708734|2679|8400|3107|0|0||2026-11-22 18:16:00.519018+00||2026-11-22 18:16:00.884883+00
+domain_stat|3096792|52270|28978|4719139|0|0|4597422|9|0|0||2026-11-22 14:46:27.441029+00||2026-11-22 17:31:54.322636+00
+ip|400277|64969|27371|532893|19039453|0|589609|219|0|0||2026-11-22 17:24:08.777646+00||2026-11-22 17:54:53.863544+00
+schema_migrations|0|0|0|0|0|0|0|0|0|0||||
+(4 rows)
+relname|total|heap|idx|relpages|reltuples
+domain_stat|5090 MB|292 MB|4798 MB|37335|3.098896e+06
+ip|1466 MB|102 MB|1363 MB|13103|399287
+domain|1192 MB|115 MB|1076 MB|14764|16279
+schema_migrations|56 kB|8192 bytes|48 kB|1|1
+(4 rows)
+relname|indexrelname|idx_scan|idx_tup_read|idx_tup_fetch|size
+domain|domain_domain_key|5135856|6773123|5127371|311 MB
+domain|idx_domain_last_seen|1062|17529|16820|264 MB
+domain|idx_domain_name|4710887|7940017|4710887|224 MB
+domain|domain_pkey|14172642|17826228|14171887|54 MB
+domain|idx_domain_time_insert|0|0|0|53 MB
+domain|idx_domain_resolv_lookup|0|0|0|53 MB
+domain|idx_domain_resolv_count|0|0|0|42 MB
+domain|idx_domain_resolv|0|0|0|42 MB
+domain|idx_domain_last_resolv_time|47933|538547318|331595918|34 MB
+domain_stat|idx_domain_stat_time_domain|36|4311|0|2064 MB
+domain_stat|idx_domain_stat_time_client|0|0|0|1301 MB
+domain_stat|idx_domain_stat_timestamp|269|49430969|674793|422 MB
+domain_stat|domain_stat_pkey|0|0|0|404 MB
+domain_stat|idx_domain_stat_client_ip|0|0|0|208 MB
+domain_stat|idx_domain_stat_domain|0|0|0|206 MB
+domain_stat|idx_domain_stat_rtype|0|0|0|191 MB
+ip|idx_ip_time_cleanup|0|0|0|484 MB
+ip|idx_ip_time|0|0|0|483 MB
+ip|ip_pkey|0|0|0|182 MB
+ip|ip_domain_id_ip_key|19572353|20450498|19039460|95 MB
+ip|idx_ip_address|17|5478356|4907975|30 MB
+ip|idx_ip_domain|0|0|0|25 MB
+ip|idx_ip_domain_id|23103|1098313|744229|25 MB
+ip|idx_ip_type|52722|8359958376|7654013210|20 MB
+ip|idx_ip_domain_type|44335|6426799734|4915964819|20 MB
+schema_migrations|schema_migrations_pkey|0|0|0|16 kB
+(26 rows)
+tablename|indexname|indexdef
+domain|domain_domain_key|CREATE UNIQUE INDEX domain_domain_key ON public.domain USING btree (domain)
+domain|domain_pkey|CREATE UNIQUE INDEX domain_pkey ON public.domain USING btree (id)
+domain|idx_domain_last_resolv_time|CREATE INDEX idx_domain_last_resolv_time ON public.domain USING btree (last_resolv_time)
+domain|idx_domain_last_seen|CREATE INDEX idx_domain_last_seen ON public.domain USING btree (last_seen)
+domain|idx_domain_name|CREATE INDEX idx_domain_name ON public.domain USING btree (domain)
+domain|idx_domain_resolv|CREATE INDEX idx_domain_resolv ON public.domain USING btree (resolv_count, max_resolv)
+domain|idx_domain_resolv_count|CREATE INDEX idx_domain_resolv_count ON public.domain USING btree (resolv_count) WHERE (resolv_count < max_resolv)
+domain|idx_domain_resolv_lookup|CREATE INDEX idx_domain_resolv_lookup ON public.domain USING btree (resolv_count, last_resolv_time) WHERE (resolv_count < max_resolv)
+domain|idx_domain_time_insert|CREATE INDEX idx_domain_time_insert ON public.domain USING btree (time_insert)
+domain_stat|domain_stat_pkey|CREATE UNIQUE INDEX domain_stat_pkey ON public.domain_stat USING btree (id)
+domain_stat|idx_domain_stat_client_ip|CREATE INDEX idx_domain_stat_client_ip ON public.domain_stat USING btree (client_ip)
+domain_stat|idx_domain_stat_domain|CREATE INDEX idx_domain_stat_domain ON public.domain_stat USING btree (domain)
+domain_stat|idx_domain_stat_rtype|CREATE INDEX idx_domain_stat_rtype ON public.domain_stat USING btree (rtype)
+domain_stat|idx_domain_stat_time_client|CREATE INDEX idx_domain_stat_time_client ON public.domain_stat USING btree ("timestamp" DESC, client_ip)
+domain_stat|idx_domain_stat_time_domain|CREATE INDEX idx_domain_stat_time_domain ON public.domain_stat USING btree ("timestamp" DESC, domain)
+domain_stat|idx_domain_stat_timestamp|CREATE INDEX idx_domain_stat_timestamp ON public.domain_stat USING btree ("timestamp")
+ip|idx_ip_address|CREATE INDEX idx_ip_address ON public.ip USING btree (ip)
+ip|idx_ip_domain|CREATE INDEX idx_ip_domain ON public.ip USING btree (domain_id)
+ip|idx_ip_domain_id|CREATE INDEX idx_ip_domain_id ON public.ip USING btree (domain_id)
+ip|idx_ip_domain_type|CREATE INDEX idx_ip_domain_type ON public.ip USING btree (domain_id, type)
+ip|idx_ip_time|CREATE INDEX idx_ip_time ON public.ip USING btree ("time")
+ip|idx_ip_time_cleanup|CREATE INDEX idx_ip_time_cleanup ON public.ip USING btree ("time")
+ip|idx_ip_type|CREATE INDEX idx_ip_type ON public.ip USING btree (type)
+ip|ip_domain_id_ip_key|CREATE UNIQUE INDEX ip_domain_id_ip_key ON public.ip USING btree (domain_id, ip)
+ip|ip_pkey|CREATE UNIQUE INDEX ip_pkey ON public.ip USING btree (id)
+schema_migrations|schema_migrations_pkey|CREATE UNIQUE INDEX schema_migrations_pkey ON public.schema_migrations USING btree (version)
+(26 rows)
+checkpoints_timed|checkpoints_req|checkpoint_write_time|checkpoint_sync_time|buffers_checkpoint|buffers_clean|maxwritten_clean|buffers_backend|buffers_backend_fsync|buffers_alloc|stats_reset
+3193|4|861273170|122642|20705065|33426890|116384|13586683|0|39918749|2026-11-11 15:40:56.802653+00
+(1 row)
+wal_records|wal_fpi|wal_bytes|wal_buffers_full|wal_write|wal_sync|wal_write_time|wal_sync_time|stats_reset
+481895524|60439722|235696501859|267746|22568908|22254023|0|0|2026-11-11 15:40:56.802653+00
+(1 row)
+datname|numbackends|xact_commit|xact_rollback|blks_read|blks_hit|tup_returned|tup_fetched|tup_inserted|tup_updated|tup_deleted|conflicts|temp_files|temp_bytes|deadlocks|stats_reset
+dns_collector|6|95917925|405|584165118|7866051849|16259584909|13635329043|5270171|31782556|5205085|0|0|0|0|
+(1 row)
+backend_type|object|context|reads|read_time|writes|write_time|writebacks|writeback_time|extends|extend_time|hits|evictions|reuses|fsyncs
+background writer|relation|normal|||33426890|0|33426752|0||||||0
+checkpointer|relation|normal|||20705063|0|20705051|0||||||158309
+autovacuum worker|relation|vacuum|541447655|0|10922748|0|0|0|0|0|26660526|483770|540963827|
+client backend|relation|normal|36460878|0|2535797|0|0|0|1478|0|4668727048|36426346||0
+background worker|relation|normal|486407|0|48177|0|0|0|0|0|2779375095|473694||0
+autovacuum worker|relation|normal|2386510|0|42024|0|0|0|207|0|453293650|2386575||0
+client backend|relation|bulkread|3184748|0|31253|0|0|0|||1372506|54579|3129751|
+startup|relation|normal|29|0|4717|0|0|0|0|0|52161|4770||0
+background worker|relation|bulkread|198996|0|201|0|0|0|||54401|1898|197098|
+standalone backend|relation|bulkread|0|0|0|0|0|0|||0|0|0|
+standalone backend|relation|bulkwrite|0|0|0|0|0|0|0|0|0|0|0|
+standalone backend|relation|normal|0|0|0|0|0|0|0|0|0|0||0
+standalone backend|relation|vacuum|0|0|0|0|0|0|0|0|0|0|0|
+startup|relation|bulkread|0|0|0|0|0|0|||0|0|0|
+startup|relation|bulkwrite|0|0|0|0|0|0|0|0|0|0|0|
+startup|relation|vacuum|0|0|0|0|0|0|0|0|0|0|0|
+walsender|relation|bulkread|0|0|0|0|0|0|||0|0|0|
+walsender|relation|bulkwrite|0|0|0|0|0|0|0|0|0|0|0|
+walsender|relation|normal|0|0|0|0|0|0|0|0|0|0||0
+walsender|relation|vacuum|0|0|0|0|0|0|0|0|0|0|0|
+autovacuum launcher|relation|bulkread|0|0|0|0|0|0|||0|0|0|
+walsender|temp relation|normal|0|0|0|0|||0|0|0|0||
+autovacuum launcher|relation|normal|3|0|0|0|0|0|||1121|1||0
+autovacuum worker|relation|bulkread|0|0|0|0|0|0|||0|0|0|
+client backend|relation|bulkwrite|0|0|0|0|0|0|0|0|0|0|0|
+client backend|relation|vacuum|0|0|0|0|0|0|0|0|0|0|0|
+client backend|temp relation|normal|0|0|0|0|||0|0|0|0||
+background worker|relation|bulkwrite|0|0|0|0|0|0|0|0|0|0|0|
+background worker|relation|vacuum|0|0|0|0|0|0|0|0|0|0|0|
+background worker|temp relation|normal|0|0|0|0|||0|0|0|0||
+(30 rows)
+extname|extversion
+plpgsql|1.0
+(1 row)
+state|count
+active|1
+idle|5
+(2 rows)
+pid|datid|datname|relid|phase|heap_blks_total|heap_blks_scanned|heap_blks_vacuumed|index_vacuum_count|max_dead_tuples|num_dead_tuples
+(0 rows)
+relname|reloptions
+domain_stat|
+ip|
+domain|
+schema_migrations|
+(4 rows)

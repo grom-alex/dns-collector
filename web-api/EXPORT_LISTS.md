@@ -416,7 +416,7 @@ curl http://dns-api:8080/api/domains?limit=100
 curl http://dns-api:8080/export/your-list-excluded
 
 # Проверить логи
-docker-compose logs web-api | grep "Export list returned empty"
+docker compose logs web-api | grep "Export list returned empty"
 ```
 
 ### Проблема: Файл дополнительных IP не загружается
@@ -436,7 +436,7 @@ docker exec dns-collector-webapi ls -la /app/config/
 docker exec dns-collector-webapi cat /app/config/your-file.txt
 
 # Проверить логи
-docker-compose logs web-api | grep "additional"
+docker compose logs web-api | grep "additional"
 ```
 
 ### Проблема: Excluded endpoint возвращает пустой список
