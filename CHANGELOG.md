@@ -2,7 +2,9 @@
 
 All notable changes to DNS Collector will be documented in this file.
 
-## [Unreleased] - 2026-11-24
+## [Unreleased]
+
+## [2.9.0] - 2026-11-24
 
 ### Changed
 
@@ -56,6 +58,11 @@ All notable changes to DNS Collector will be documented in this file.
 
 - Изменения в этом разделе: документация, вспомогательные скрипты, compose-настройки PostgreSQL для `pg_stat_statements`, включение статистики и этап 1 оптимизации записи (кэш доменов, батчинг статистики, троттлинг `last_seen`, upsert IP без перезаписи неизменных адресов).
 - Пункты, требующие изменения схемы/эксплуатации (партиционирование `domain_stat`, удаление/пересоздание индексов, PostgreSQL-тюнинг, ZFS 8K), описаны в плане и ещё не реализованы. Этап 1 реализован в PR #17.
+
+### Docker Images
+
+- `registry.gromas.ru/apps/dns-collector/dns-collector:2.9.0`
+- `registry.gromas.ru/apps/dns-collector/web-api:2.9.0`
 
 ## [2.8.0] - 2026-01-02
 

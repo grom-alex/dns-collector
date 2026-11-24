@@ -4,14 +4,14 @@ Production-ready configuration for DNS Collector system.
 
 ## Version
 
-**v2.8.0** — текущий production-релиз.
+**v2.9.0** — текущий production-релиз.
 
 Порядок релиза, публикации образов и отката: [../../CONTRIBUTING.md](../../CONTRIBUTING.md#6-версии-релиз-публикация).
 
 ## Docker Images
 
-- `registry.gromas.ru/apps/dns-collector/dns-collector:2.8.0`
-- `registry.gromas.ru/apps/dns-collector/web-api:2.8.0`
+- `registry.gromas.ru/apps/dns-collector/dns-collector:2.9.0`
+- `registry.gromas.ru/apps/dns-collector/web-api:2.9.0`
 
 ## Quick Start
 

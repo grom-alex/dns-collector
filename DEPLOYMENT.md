@@ -5,7 +5,7 @@
 - **Development**: See [QUICKSTART_WEBAPI.md](QUICKSTART_WEBAPI.md)
 - **Production**: See [deploy/production/README.md](deploy/production/README.md)
 
-## Version 2.8.0
+## Version 2.9.0
 
 Latest release with PostgreSQL backend. Процесс релиза и деплоя — в [CONTRIBUTING.md](CONTRIBUTING.md#6-версии-релиз-публикация) и [CONTRIBUTING.md](CONTRIBUTING.md#7-деплой).
 
@@ -13,11 +13,11 @@ Latest release with PostgreSQL backend. Процесс релиза и депл�
 
 ```bash
 # DNS Collector
-registry.gromas.ru/apps/dns-collector/dns-collector:2.8.0
+registry.gromas.ru/apps/dns-collector/dns-collector:2.9.0
 registry.gromas.ru/apps/dns-collector/dns-collector:latest
 
 # Web API
-registry.gromas.ru/apps/dns-collector/web-api:2.8.0
+registry.gromas.ru/apps/dns-collector/web-api:2.9.0
 registry.gromas.ru/apps/dns-collector/web-api:latest
 ```
 
