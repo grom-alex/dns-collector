@@ -93,7 +93,7 @@ dns-collector/                          # repository root
 │   └── workflows/
 │       ├── test.yml                    # tests + race + lint + coverage
 │       ├── build.yml                   # build + Docker (legacy, see plan)
-│       └── release.yml                 # release artifacts on tags
+│       └── release.yml                 # Docker push + binaries + GitHub Release on tags
 │
 ├── docker-compose.yml                  # dev/all-in-one compose
 ├── CONTRIBUTING.md                     # branch/PR/CI/release/deploy workflow
