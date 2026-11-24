@@ -30,7 +30,7 @@ retention:
 
 metrics:
   enabled: true
-  port: 9090
+  port: 8081
   path: "/metrics"
   influxdb:
     enabled: false

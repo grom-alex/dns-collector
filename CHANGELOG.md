@@ -4,6 +4,10 @@ All notable changes to DNS Collector will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Production config/compose now expose collector metrics on `8081`, matching the running stand; documented that the default config uses `9090`.
+
 ### Changed
 
 - Release workflow builds binaries and creates GitHub Release on `v*` tags (Go 1.24). Docker images are published from the internal build host: `registry.gromas.ru` is not resolvable from GitHub-hosted runners, and an attempt to push from CI failed with `no such host`.

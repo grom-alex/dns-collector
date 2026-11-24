@@ -215,7 +215,7 @@ docker compose logs -f
 
 - `5353/udp` — collector;
 - `8080/tcp` — web-api/UI;
-- `9090/tcp` — метрики collector (в production-compose);
+- `8081/tcp` — метрики collector в production-compose (default-конфиг — `9090`);
 - `5432/tcp` — PostgreSQL (лучше не публиковать).
 
 ## Мониторинг
@@ -229,7 +229,7 @@ docker compose logs -f web-api
 
 ### Метрики
 
-- Collector: `http://localhost:9090/metrics`
+- Collector в production: `http://localhost:8081/metrics` (default-конфиг — `9090`)
 - web-api: `http://localhost:8080/metrics`
 
 Основные группы:

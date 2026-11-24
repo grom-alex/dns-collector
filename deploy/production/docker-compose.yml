@@ -63,7 +63,7 @@ services:
 
     ports:
       - "5353:5353/udp"
-      - "9090:9090"  # Prometheus metrics endpoint
+      - "8081:8081"  # Prometheus metrics endpoint
 
     volumes:
       - ./config/dns-collector.yaml:/app/config/config.yaml:ro
