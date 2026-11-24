@@ -1,7 +1,10 @@
 # Multi-stage build для минимального размера образа
 
 # Stage 1: Build
-FROM golang:1.24-bookworm AS builder
+FROM --platform=$BUILDPLATFORM golang:1.24-bookworm AS builder
+
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
 
 # Установка необходимых пакетов для сборки
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -18,7 +21,7 @@ RUN go mod download
 COPY . .
 
 # Сборка приложения
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o dns-collector ./cmd/dns-collector
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -ldflags="-s -w" -o dns-collector ./cmd/dns-collector
 
 # Stage 2: Runtime
 FROM debian:bookworm-slim
