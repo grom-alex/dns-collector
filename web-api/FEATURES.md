@@ -133,16 +133,16 @@ Web API предоставляет полнофункциональный веб
 ### Backend
 
 #### Производительность
-- Read-only доступ к БД (безопасно для продакшена)
+- Чтение данных из БД; DDL-миграции применяются при старте
 - Эффективные SQL запросы с индексами
 - Пагинация на уровне БД
-- Минимальное использование памяти
+- Минимальное использование памяти (кроме экспорта больших выборок)
 
 #### Безопасность
-- Валидация всех входных данных
-- Защита от SQL injection
+- Валидация ключевых параметров (limit, subnet, regex)
+- Параметризованные SQL-запросы (защита от SQL injection)
 - CORS конфигурация
-- Read-only режим БД
+- Встроенной аутентификации нет: нужен reverse proxy с auth
 
 #### Масштабируемость
 - Stateless архитектура
@@ -247,7 +247,8 @@ done
 
 **Или используйте прямой SQL запрос**:
 ```bash
-sqlite3 data/stats.db "SELECT domain, COUNT(*) as count FROM domain_stat GROUP BY domain ORDER BY count DESC LIMIT 10;"
+docker compose exec -T postgres psql -U dns_collector -d dns_collector \
+  -c "SELECT domain, COUNT(*) AS count FROM domain_stat GROUP BY domain ORDER BY count DESC LIMIT 10;"
 ```
 
 ### Сценарий 6: Экспорт списков для pfSense
@@ -306,15 +307,21 @@ for record in stats['data']:
 
 #### Через SQL (прямой доступ к БД)
 ```python
-import sqlite3
+import psycopg2
 
-conn = sqlite3.connect('data/stats.db')
+conn = psycopg2.connect(
+    host="localhost",
+    port=5432,
+    user="dns_collector",
+    password="...",
+    dbname="dns_collector",
+)
 cursor = conn.cursor()
 
 cursor.execute("""
-    SELECT domain, COUNT(*) as count
+    SELECT domain, COUNT(*) AS count
     FROM domain_stat
-    WHERE timestamp >= datetime('now', '-1 hour')
+    WHERE timestamp >= now() - interval '1 hour'
     GROUP BY domain
     ORDER BY count DESC
     LIMIT 10

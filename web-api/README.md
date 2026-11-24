@@ -2,6 +2,8 @@
 
 Web-микросервис для визуализации и анализа данных DNS Collector.
 
+> **Безопасность:** встроенной аутентификации нет. Не выставляйте сервис в интернет без reverse proxy с auth. CORS не заменяет аутентификацию. Подробнее — в [../docs/OPTIMIZATION_PLAN.md](../docs/OPTIMIZATION_PLAN.md#этап-8-безопасность-45-дней-можно-параллельно).
+
 ## Возможности
 
 ### Статистика DNS-запросов
@@ -43,16 +45,19 @@ web-api/
 ├── cmd/                    # Точка входа приложения
 │   └── main.go
 ├── internal/               # Внутренние пакеты
-│   ├── database/          # Слой работы с БД
+│   ├── database/          # Слой работы с БД (read + migrations)
 │   ├── handlers/          # HTTP handlers
-│   └── models/            # Модели данных
+│   ├── models/            # Модели данных
+│   ├── excel/             # Генерация XLSX
+│   ├── metrics/           # Prometheus + Gin middleware
+│   └── utils/             # Парсинг IP из файлов
 ├── frontend/              # Vue.js фронтенд
 │   ├── src/
 │   │   ├── api/          # API клиент
-│   │   ├── components/   # Vue компоненты
-│   │   ├── views/        # Страницы
+│   │   ├── views/        # Страницы (Stats, Domains)
 │   │   └── App.vue
-│   └── package.json
+│   ├── package.json
+│   └── vite.config.js
 ├── config/                # Конфигурация
 │   └── config.yaml
 ├── Dockerfile
@@ -268,7 +273,10 @@ npm run dev
 ```bash
 cd web-api
 docker build -t dns-collector-webapi .
-docker run -p 8080:8080 -v $(pwd)/../data:/app/data dns-collector-webapi
+docker run -p 8080:8080 \
+  -e POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
+  -e POSTGRES_SSL_MODE=disable \
+  dns-collector-webapi
 ```
 
 ## Конфигурация
@@ -281,8 +289,12 @@ server:
   host: "0.0.0.0"
 
 database:
-  domains_db: "../data/domains.db"
-  stats_db: "../data/stats.db"
+  host: "localhost"
+  port: 5432
+  user: "dns_collector"
+  password: ""          # POSTGRES_PASSWORD
+  database: "dns_collector"
+  ssl_mode: "disable"
 
 logging:
   level: "info"
@@ -297,9 +309,9 @@ cors:
 ## Технологии
 
 **Backend:**
-- Go 1.21
+- Go 1.24
 - Gin Web Framework
-- SQLite3
+- PostgreSQL 16 (`lib/pq`, `golang-migrate`)
 
 **Frontend:**
 - Vue.js 3
@@ -309,7 +321,7 @@ cors:
 
 ## Примеры использования регулярных выражений
 
-В фильтре доменов можно использовать любые регулярные выражения Go:
+В фильтре доменов используется PostgreSQL-оператор `~` (POSIX regex), а не regexp Go:
 
 - `^google\.` - домены, начинающиеся с "google."
 - `\.com$` - все .com домены
@@ -319,8 +331,9 @@ cors:
 
 ## База данных
 
-Сервис работает с двумя SQLite базами в режиме read-only:
-- `domains.db` - информация о доменах и их IP адресах
-- `stats.db` - статистика DNS запросов
+Сервис работает с общей PostgreSQL:
+- `domain` — информация о доменах и их IP-адресах;
+- `ip` — IPv4/IPv6 адреса доменов;
+- `domain_stat` — статистика DNS-запросов.
 
-Базы данных создаются и наполняются основным сервисом dns-collector.
+Данные создаёт и наполняет `dns-collector`; web-api читает их и применяет те же миграции при старте. Схема описана в [../dns-collector/ARCHITECTURE.md](../dns-collector/ARCHITECTURE.md#6-схема-бд).

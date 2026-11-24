@@ -24,6 +24,39 @@ All notable changes to DNS Collector will be documented in this file.
 - Unchanged IP addresses no longer generate an UPDATE on every resolution.
 - Docker images moved from Debian bullseye to bookworm (`golang:1.24-bookworm`, `debian:bookworm-slim`): the bullseye-security repository started returning 404 for openssl/ca-certificates, breaking CI Docker builds.
 
+### Documentation
+
+- Добавлен [docs/OPTIMIZATION_PLAN.md](docs/OPTIMIZATION_PLAN.md) — приоритизированный план устранения недостатков с фокусом на снижение записи в PostgreSQL и износа NVMe (разбор 82,8 млн UPDATE в domain, 123,3 млн в ip, 33 млн DELETE в domain_stat, ZFS 16K vs 8K).
+- Снят baseline боевого стенда 192.168.0.15 на 2026-11-23: [docs/DB_BASELINE.md](docs/DB_BASELINE.md) и сырые данные в [docs/baseline/2026-11-23](docs/baseline/2026-11-23/) (7 755 MB БД, 93,3% индексов, 49,9 GB/сутки буферов, 21,2 GB/сутки WAL, 89,1 GB/сутки записи на /dev/sdb1).
+- Включены `pg_stat_statements` и `track_io_timing` на боевом PostgreSQL; добавлен [docs/DB_STATISTICS.md](docs/DB_STATISTICS.md) и первый query-level срез. В `docker-compose.yml` и `deploy/production/docker-compose.yml` добавлен `command` для PostgreSQL, чтобы настройки воспроизводились при пересоздании контейнера.
+- Добавлен [scripts/pg_monitor_24h.sh](scripts/pg_monitor_24h.sh) и [docs/DB_MONITORING.md](docs/DB_MONITORING.md): 24-часовой сбор `pg_stat_statements`, `pg_stat_io`, `pg_stat_bgwriter`, `pg_stat_wal`, размеров/UPDATE, `/proc/diskstats`, `docker stats` и метрик сервисов с интервалом 5 минут. Запущен на стенде 2026-11-23 00:44 +06.
+- Снят 24-часовой профиль (286 срезов, 0 ошибок) и добавлен [docs/DB_MONITORING_REPORT.md](docs/DB_MONITORING_REPORT.md): подтверждены 1,77 млн IP-upsert/сутки (69% WAL), 1,13 млн UPDATE `domain`, 369 тыс. DELETE `domain_stat`, 50,2 GB/сутки буферов, 20,8 GB/сутки WAL, 89,1 GB/сутки записи на `sdb1`. Добавлен анализатор [scripts/analyze_pg_monitoring.py](scripts/analyze_pg_monitoring.py) и сырые данные в [docs/baseline/2026-11-24](docs/baseline/2026-11-24/).
+- Полностью переписаны под текущий стек (PostgreSQL 16, Go 1.24, Vue 3):
+  - [dns-collector/ARCHITECTURE.md](dns-collector/ARCHITECTURE.md)
+  - [dns-collector/QUICKSTART.md](dns-collector/QUICKSTART.md)
+  - [dns-collector/INSTALL.md](dns-collector/INSTALL.md)
+  - [dns-collector/DOCKER.md](dns-collector/DOCKER.md)
+  - [SUMMARY.md](SUMMARY.md)
+  - [SERVICES.md](SERVICES.md)
+  - [TESTING.md](TESTING.md)
+- Создан [dns-collector/README.md](dns-collector/README.md) — исправлена битая ссылка из корневого README и связанных документов.
+- Обновлены [README.md](README.md) (ссылки, docker compose), [QUICKSTART_WEBAPI.md](QUICKSTART_WEBAPI.md), [web-api/README.md](web-api/README.md), [web-api/INSTALL.md](web-api/INSTALL.md), [web-api/FEATURES.md](web-api/FEATURES.md).
+- [PROJECT_STRUCTURE.txt](PROJECT_STRUCTURE.txt) приведён к фактической структуре репозитория.
+- [dns-collector/queries.sql](dns-collector/queries.sql) и [dns-collector/monitor.sh](dns-collector/monitor.sh) переведены с SQLite на PostgreSQL/psql.
+- [dns-collector/TEST_RESULTS.md](dns-collector/TEST_RESULTS.md) и [dns-collector/DOCKER_TEST_RESULTS.md](dns-collector/DOCKER_TEST_RESULTS.md) помечены как исторические снимки v1.0.0.
+- Удалены ссылки на несуществующие файлы и устаревшие SQLite-команды.
+
+### Process
+
+- Добавлен [CONTRIBUTING.md](CONTRIBUTING.md) — обязательный порядок ветвления, PR, тестов, CI, релиза, публикации образов и деплоя.
+- Добавлен [.github/pull_request_template.md](.github/pull_request_template.md).
+- [.claude/DEVELOPMENT_WORKFLOW.md](.claude/DEVELOPMENT_WORKFLOW.md) заменён указателем на `CONTRIBUTING.md` (старые пути и версии удалены).
+
+### Notes
+
+- Изменения в этом разделе: документация, вспомогательные скрипты, compose-настройки PostgreSQL для `pg_stat_statements`, включение статистики и этап 1 оптимизации записи (кэш доменов, батчинг статистики, троттлинг `last_seen`, upsert IP без перезаписи неизменных адресов).
+- Пункты, требующие изменения схемы/эксплуатации (партиционирование `domain_stat`, удаление/пересоздание индексов, PostgreSQL-тюнинг, ZFS 8K), описаны в плане и ещё не реализованы. Этап 1 реализован в PR #17.
+
 ## [2.8.0] - 2026-01-02
 
 ### Changed

@@ -6,7 +6,7 @@
 
 ```bash
 # Из корневой директории проекта
-docker-compose up -d
+docker compose up -d
 ```
 
 Это запустит:
@@ -91,42 +91,45 @@ curl "http://localhost:8080/api/domains?domain_regex=\\.ru$"
 
 ```bash
 # Все логи
-docker-compose logs -f
+docker compose logs -f
 
 # Только web-api
-docker-compose logs -f web-api
+docker compose logs -f web-api
 
 # Только dns-collector
-docker-compose logs -f dns-collector
+docker compose logs -f dns-collector
 ```
 
 ### Статус сервисов
 
 ```bash
-docker-compose ps
+docker compose ps
 ```
 
 ### Проверка БД
 
 ```bash
 # Количество доменов
-sqlite3 data/domains.db "SELECT COUNT(*) FROM domain;"
+docker compose exec -T postgres psql -U dns_collector -d dns_collector \
+  -c "SELECT COUNT(*) FROM domain;"
 
 # Количество запросов
-sqlite3 data/stats.db "SELECT COUNT(*) FROM domain_stat;"
+docker compose exec -T postgres psql -U dns_collector -d dns_collector \
+  -c "SELECT COUNT(*) FROM domain_stat;"
 
 # Последние 5 запросов
-sqlite3 data/stats.db "SELECT domain, client_ip, datetime(timestamp) FROM domain_stat ORDER BY timestamp DESC LIMIT 5;"
+docker compose exec -T postgres psql -U dns_collector -d dns_collector \
+  -c "SELECT domain, client_ip, timestamp FROM domain_stat ORDER BY timestamp DESC LIMIT 5;"
 ```
 
 ## Остановка
 
 ```bash
 # Остановить все сервисы
-docker-compose down
+docker compose down
 
 # Остановить и удалить volumes
-docker-compose down -v
+docker compose down -v
 ```
 
 ## Разработка
@@ -195,8 +198,8 @@ docker ps | grep webapi
 docker logs dns-collector-webapi
 
 # Пересоберите образ
-docker-compose build web-api
-docker-compose up -d web-api
+docker compose build web-api
+docker compose up -d web-api
 ```
 
 ### Пустые данные
@@ -206,8 +209,8 @@ docker-compose up -d web-api
 docker logs dns-collector
 
 # Проверьте БД
-ls -la data/
-sqlite3 data/stats.db "SELECT COUNT(*) FROM domain_stat;"
+docker compose exec -T postgres psql -U dns_collector -d dns_collector \
+  -c "SELECT COUNT(*) FROM domain_stat;"
 
 # Отправьте тестовые данные
 echo '{"client_ip":"192.168.1.10","domain":"test.com","qtype":"A","rtype":"dns"}' | nc -u -w1 localhost 5353
@@ -216,14 +219,15 @@ echo '{"client_ip":"192.168.1.10","domain":"test.com","qtype":"A","rtype":"dns"}
 ### Ошибка подключения к БД
 
 ```bash
-# Проверьте что volume смонтирован
-docker inspect dns-collector-webapi | grep Mounts -A 10
+# Проверьте, что PostgreSQL запущен и здоров
+docker compose ps
+docker compose exec -T postgres pg_isready -U dns_collector -d dns_collector
 
-# Проверьте права доступа
-ls -la data/
+# Проверьте host/port/user/password в web-api/config/config.yaml
+# В compose host должен быть "postgres", а не "localhost"
 
 # Пересоздайте контейнер
-docker-compose up -d --force-recreate web-api
+docker compose up -d --force-recreate web-api
 ```
 
 ## Дополнительная информация
@@ -237,20 +241,21 @@ docker-compose up -d --force-recreate web-api
 
 ```bash
 # Перезапуск сервисов
-docker-compose restart
+docker compose restart
 
 # Обновление образов
-docker-compose pull
-docker-compose up -d
+docker compose pull
+docker compose up -d
 
 # Просмотр использования ресурсов
 docker stats dns-collector dns-collector-webapi
 
 # Backup БД
-cp data/domains.db data/domains_backup_$(date +%Y%m%d).db
-cp data/stats.db data/stats_backup_$(date +%Y%m%d).db
+docker compose exec -T postgres \
+  pg_dump -U dns_collector -d dns_collector -Fc > dns_$(date +%F).dump
 
-# Очистка старых данных (> 30 дней)
-sqlite3 data/stats.db "DELETE FROM domain_stat WHERE timestamp < datetime('now', '-30 days');"
-sqlite3 data/stats.db "VACUUM;"
+# Retention выполняется сервисом dns-collector автоматически
+# (retention.stats_days, cleanup_interval_hours); ручной DELETE не нужен.
+# Проверить настройки:
+grep -A6 '^retention:' dns-collector/config/config.yaml
 ```

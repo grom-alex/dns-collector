@@ -1,0 +1,231 @@
+### captured_at 2026-11-23T00:18:17+06:00
+### uname
+Linux docker-debian 6.1.0-33-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.1.133-1 (2025-04-10) x86_64 GNU/Linux
+### resources
+8
+               total        used        free      shared  buff/cache   available
+Mem:            15Gi       4,2Gi       305Mi       683Mi        12Gi        11Gi
+Swap:          974Mi       5,8Mi       969Mi
+ 00:18:17 up 10 days,  7:35,  1 user,  load average: 0,28, 0,26, 0,20
+### df
+Файловая система                        Тип      Размер Использовано  Дост Использовано% Cмонтировано в
+udev                                    devtmpfs   7,8G            0  7,8G            0% /dev
+tmpfs                                   tmpfs      1,6G         1,6M  1,6G            1% /run
+/dev/sda1                               ext4        62G          42G   18G           71% /
+tmpfs                                   tmpfs      7,9G            0  7,9G            0% /dev/shm
+tmpfs                                   tmpfs      5,0M            0  5,0M            0% /run/lock
+/dev/sdb1                               ext4        63G          12G   49G           19% /mnt/pgdata
+/dev/sdc                                ext4       492G         3,3G  463G            1% /mnt/nexus-data
+192.168.0.10:/mnt/nas-data/media        nfs4        14T         7,3T  6,1T           55% /mnt/nfs/media
+192.168.0.10:/mnt/nas-data/photo        nfs4       9,2T         3,2T  6,1T           34% /mnt/nfs/photo
+192.168.0.10:/mnt/nas-data/photo/immich nfs4       9,2T         3,2T  6,1T           34% /mnt/nfs/immich
+overlay                                 overlay     62G          42G   18G           71% /var/lib/docker/overlay2/3ea124a4f0da7031073e71d44159e55beaba1fd2528477e257b1dbe09da99439/merged
+overlay                                 overlay     62G          42G   18G           71% /var/lib/docker/overlay2/26eaf8d10d1dadc2bf453f96ba40a318a77dd5b17b6632f824e5e82864367066/merged
+overlay                                 overlay     62G          42G   18G           71% /var/lib/docker/overlay2/726cfd6df40f57ef54f42a59844745ce98dd16e1abf4ed7cbe7a6558edac0381/merged
+overlay                                 overlay     62G          42G   18G           71% /var/lib/docker/overlay2/19c236e0246b8efe08606b0ee5cfa940ea11ce80677a6e1147c4f81516058ca3/merged
+overlay                                 overlay     62G          42G   18G           71% /var/lib/docker/overlay2/5dcd7f2b340af5356700ec2b24f8f020987ac6d945de40a3200ab47588b62402/merged
+overlay                                 overlay     62G          42G   18G           71% /var/lib/docker/overlay2/8fe0eef17fa4c7743c3b663f83be288846d73deba7a0e7c7ee268ec91811c550/merged
+overlay                                 overlay     62G          42G   18G           71% /var/lib/docker/overlay2/4a1f28ad937d7323eeac001f2c00b07e73e98c86edbd09d400610fee66649e11/merged
+overlay                                 overlay     62G          42G   18G           71% /var/lib/docker/overlay2/3c50fd842edcd5ad8fc9ce7cbcaea4d951c0551cea5b2d8d2aa3a072536efbd4/merged
+overlay                                 overlay     62G          42G   18G           71% /var/lib/docker/overlay2/a7a6945186f5abc438f99cae3905f18eacf197f8e782d8aff437fac58128fc44/merged
+overlay                                 overlay     62G          42G   18G           71% /var/lib/docker/overlay2/529b823662e58bececf98698d491fc451dd5e91833781f817e32a35cafe607a0/merged
+overlay                                 overlay     62G          42G   18G           71% /var/lib/docker/overlay2/4c8b69dd7fa03879920c9a583d56cf6f86a0080406999831b6477fd945c45eb6/merged
+tmpfs                                   tmpfs      1,6G            0  1,6G            0% /run/user/0
+### lsblk
+NAME    SIZE TYPE FSTYPE MOUNTPOINT      ROTA SCHED
+sda      64G disk                           0 none
+├─sda1   63G part ext4   /                  0 none
+├─sda2    1K part                           0 none
+└─sda5  975M part swap   [SWAP]             0 none
+sdb      64G disk                           0 none
+└─sdb1   64G part ext4   /mnt/pgdata        0 none
+sdc     500G disk ext4   /mnt/nexus-data    1 none
+sr0    1024M rom                            1 mq-deadline
+### diskstats
+   8       0 sda 67381 10378 4815350 28217 1659355 1395699 41946056 2849628 0 2520404 4519175 10954 0 43134152 775 190599 1640553
+   8       1 sda1 66967 10363 4802786 28178 1658234 1395698 41937088 2849226 0 2768136 2878180 10954 0 43134152 775 0 0
+   8      16 sdb 51133682 6082 6916280986 4802703 92699112 1491264 1796476040 48191624 0 41417716 92259595 5469 0 107846832 295 21124345 39264971
+   8      17 sdb1 51133572 6082 6916277418 4802697 92699112 1491264 1796476040 48191624 0 45091148 52994618 5469 0 107846832 295 0 0
+   8      32 sdc 1602 105 56642 9030 189335 56325 7125344 3477103 0 3616664 5581801 6507 0 1023043008 465 46353 2095202
+### docker ps
+NAMES                     IMAGE                                                       STATUS                 PORTS
+dns-collector-webapi      registry.gromas.ru/apps/dns-collector/web-api:2.8.0         Up 10 days (healthy)   0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp
+dns-collector             registry.gromas.ru/apps/dns-collector/dns-collector:2.8.0   Up 10 days             0.0.0.0:5353->5353/udp, [::]:5353->5353/udp, 0.0.0.0:8081->8081/tcp, [::]:8081->8081/tcp
+dns-collector-postgres    postgres:16-alpine                                          Up 10 days (healthy)   0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp
+nexus-nginx               nginx:alpine                                                Up 10 days             192.168.0.24:80->80/tcp, 192.168.0.24:443->443/tcp
+nexus                     sonatype/nexus3:latest                                      Up 10 days             
+immich_server             ghcr.io/immich-app/immich-server:v1.132.3                   Up 10 days (healthy)   0.0.0.0:2283->2283/tcp, [::]:2283->2283/tcp
+immich_postgres           tensorchord/pgvecto-rs:pg14-v0.2.0                          Up 10 days (healthy)   5432/tcp
+immich_machine_learning   ghcr.io/immich-app/immich-machine-learning:v1.132.3         Up 10 days (healthy)   
+immich_redis              valkey/valkey:8-bookworm                                    Up 10 days (healthy)   6379/tcp
+serviio                   soerentsch/serviio:latest                                   Up 10 days             
+portainer                 portainer/portainer-ce:latest                               Up 10 days             0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp, 0.0.0.0:9443->9443/tcp, [::]:9443->9443/tcp, 9000/tcp
+### docker stats
+NAME                      CPU %     MEM USAGE / LIMIT     BLOCK I/O         NET I/O
+dns-collector-webapi      0.23%     23.56MiB / 512MiB     26.2MB / 0B       1.46GB / 2.27GB
+dns-collector             0.45%     15.31MiB / 512MiB     10.1MB / 0B       17.1GB / 23.2GB
+dns-collector-postgres    0.10%     449.5MiB / 1GiB       3.54TB / 910GB    20.4GB / 14.7GB
+nexus-nginx               0.00%     4.113MiB / 14.49GiB   4.26MB / 4.1kB    50.9kB / 22.7kB
+nexus                     0.14%     2.148GiB / 14.49GiB   205MB / 4.09GB    18.7kB / 126B
+immich_server             0.05%     751.7MiB / 14.49GiB   221MB / 0B        38.2GB / 3.06GB
+immich_postgres           0.00%     3.11GiB / 14.49GiB    3.17GB / 2.41GB   215MB / 37.5GB
+immich_machine_learning   0.08%     262.1MiB / 14.49GiB   169MB / 0B        34.9kB / 126B
+immich_redis              0.14%     15.82MiB / 14.49GiB   15.4MB / 1.64GB   2.85GB / 718MB
+serviio                   0.11%     355.7MiB / 14.49GiB   263MB / 1.65GB    0B / 0B
+portainer                 0.00%     26.85MiB / 14.49GiB   40.1MB / 244MB    18.7kB / 126B
+### images
+dns-collector
+registry.gromas.ru/apps/dns-collector/dns-collector:2.8.0 sha256:c69a5440e6848290e9f443732d504b1879eca4aa5fc5e779a1440092edcaee7b started=2026-11-12T10:42:44.643379955Z
+dns-collector-webapi
+registry.gromas.ru/apps/dns-collector/web-api:2.8.0 sha256:72c1fedf3c8f2a92b5c224a3cdc017a599bbaae612658067b248d522a83383ed started=2026-11-12T10:42:44.632720112Z
+dns-collector-postgres
+postgres:16-alpine sha256:52f87503b2fe5ad2e0d209b1a55830db42eb3ecd3eaf1b583accb0091ab30bff started=2026-11-12T10:42:44.664897834Z
+### collector config
+server:
+  udp_port: 5353
+
+database:
+  host: "postgres"
+  port: 5432
+  user: "dns_collector"
+#  password: "CHANGE_ME_IN_PRODUCTION"  # Use environment variable or secrets management
+  database: "dns_collector"
+#  ssl_mode: "disable"  # Enable SSL for production
+
+resolver:
+  interval_seconds: 120  # 5 minutes - production interval
+  max_resolv: 10
+  timeout_seconds: 10
+  workers: 100  # More workers for production
+  cyclic_resolv: true  # Enable cyclic resolution (reset after max_resolv)
+  resolv_cooldown_mins: 360  # Cooldown between cycles (6 hours)
+
+retention:
+  stats_days: 7  # Keep statistics for 30 days (1 month)
+  cleanup_interval_hours: 1  # Run cleanup every 24 hours (once per day)
+  ip_ttl_days: 3  # IP addresses TTL (3 days) - only active domains have old IPs cleaned
+  domain_ttl_days: 14  # Delete domains not queried in 30 days (0 = disabled, domains with NULL last_seen preserved)
+
+metrics:
+  enabled: true
+  port: 8081
+  path: "/metrics"
+  influxdb:
+    enabled: true
+    url: "https://monitoring.gromas.ru:8086"
+    token: ""  # Set via INFLUXDB_TOKEN environment variable
+    organization: "gromas.ru"
+    bucket: "dns-collector"
+    interval_seconds: 10
+    insecure_skip_verify: true  # Set to true for self-signed certificates
+
+
+logging:
+  level: "info"  # info level for production
+### web-api config
+server:
+  port: 8080
+  host: "0.0.0.0"
+
+database:
+  host: "postgres"
+  port: 5432
+  user: "dns_collector"
+#  password: "CHANGE_ME_IN_PRODUCTION"  # Use environment variable or secrets management
+  database: "dns_collector"
+#  ssl_mode: "disable"  # Enable SSL for production
+
+logging:
+  level: "info"  # info level for production
+
+cors:
+  allowed_origins:
+    - "https://your-domain.com"  # Replace with actual domain
+    - "https://www.your-domain.com"
+  allow_credentials: true
+
+metrics:
+  enabled: true
+  path: "/metrics"
+  influxdb:
+    enabled: true
+    url: "https://monitoring.gromas.ru:8086"
+    token: ""  # Set via INFLUXDB_TOKEN environment variable
+    organization: "gromas.ru"
+    bucket: "dns-collector"
+    interval_seconds: 10
+    insecure_skip_verify: true  # Set to true for self-signed certificates
+
+export_lists:
+  # Example: Export specific domain and its IPs
+  - name: "TikTok"
+    endpoint: "/export/tiktok"
+    excluded_ips_endpoint: "/export/tiktok-excluded"
+    domain_regex: "(tiktok)"
+    exclude_shared_ips: true
+    include_domains: false
+  - name: "Youtube"
+    endpoint: "/export/youtube"
+    excluded_ips_endpoint: "/export/youtube-excluded"
+    domain_regex: "(googlevideo|googleapi|gstatic|ggpht|youtube|ytimg|google)"
+    exclude_shared_ips: false
+    include_domains: false
+  - name: "Telegram"
+    endpoint: "/export/telegram"
+    excluded_ips_endpoint: "/export/telergam-excluded"
+    domain_regex: "(t\\.me\\.|telegram\\.me|telegram\\.org|nicegram\\.app|telesco\\.pe|tg\\.dev)"
+    exclude_shared_ips: false
+    include_domains: false
+  - name: "Anthropic"
+    endpoint: "/export/anthropic"
+    excluded_ips_endpoint: "/export/anthropic-excluded"
+    domain_regex: "(anthropic|claude|intercom|honeycomb)"
+    exclude_shared_ips: false
+    include_domains: false### collector metrics
+dns_cleanup_domain_ips_deleted_total 307200
+dns_cleanup_domains_deleted_total 7979
+dns_cleanup_duration_seconds_sum 139.757117248
+dns_cleanup_duration_seconds_count 248
+dns_cleanup_ips_deleted_total 245438
+dns_cleanup_runs_total 248
+dns_cleanup_stats_deleted_total 4.282367e+06
+dns_db_domains_total 16279
+dns_db_ips_total 400257
+dns_resolver_active_workers 0
+dns_resolver_batch_size 0
+dns_resolver_domains_processed_total{status="no_results"} 600555
+dns_resolver_domains_processed_total{status="success"} 6.827445e+06
+dns_resolver_lookup_duration_seconds_sum{ip_version="ipv4"} 2.2861647111385656e+06
+dns_resolver_lookup_duration_seconds_count{ip_version="ipv4"} 7.428e+06
+dns_resolver_lookup_duration_seconds_sum{ip_version="ipv6"} 1.3113001487375365e+06
+dns_resolver_lookup_duration_seconds_count{ip_version="ipv6"} 7.428e+06
+dns_resolver_lookups_total{ip_version="ipv4",status="error"} 633376
+dns_resolver_lookups_total{ip_version="ipv4",status="success"} 6.794624e+06
+dns_resolver_lookups_total{ip_version="ipv6",status="error"} 5.270419e+06
+dns_resolver_lookups_total{ip_version="ipv6",status="success"} 2.157581e+06
+dns_server_domains_received_total{rtype="cache"} 1.857393e+06
+dns_server_domains_received_total{rtype="reply"} 2.568142e+06
+dns_server_messages_received_total{status="invalid"} 750
+dns_server_messages_received_total{status="valid"} 4.425535e+06
+dns_server_new_domains_total 7848
+dns_server_processing_duration_seconds_sum 237159.83901793853
+dns_server_processing_duration_seconds_count 4.425535e+06
+go_goroutines 17
+process_cpu_seconds_total 10776.49
+process_resident_memory_bytes 2.0455424e+07
+### web-api metrics
+api_domains_queries_total 0
+api_stats_queries_total 0
+go_goroutines 12
+http_requests_total{method="GET",path="/export/telegram",status="200"} 20
+http_requests_total{method="GET",path="/export/tiktok",status="200"} 10
+http_requests_total{method="GET",path="/export/youtube",status="200"} 10
+http_requests_total{method="GET",path="/health",status="200"} 1
+http_requests_total{method="HEAD",path="/health",status="200"} 29660
+process_resident_memory_bytes 2.5325568e+07
+### logs 1h
+148399
+14126115
+### logs 24h
+1277677
+122061062

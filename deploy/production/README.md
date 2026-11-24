@@ -4,12 +4,14 @@ Production-ready configuration for DNS Collector system.
 
 ## Version
 
-**v2.0.1** - Environment variable configuration support
+**v2.8.0** — текущий production-релиз.
+
+Порядок релиза, публикации образов и отката: [../../CONTRIBUTING.md](../../CONTRIBUTING.md#6-версии-релиз-публикация).
 
 ## Docker Images
 
-- `registry.gromas.ru/apps/dns-collector/dns-collector:2.0.1`
-- `registry.gromas.ru/apps/dns-collector/web-api:2.0.1`
+- `registry.gromas.ru/apps/dns-collector/dns-collector:2.8.0`
+- `registry.gromas.ru/apps/dns-collector/web-api:2.8.0`
 
 ## Quick Start
 
@@ -94,16 +96,16 @@ nano .env
 
 ```bash
 # Start all services
-docker-compose up -d
+docker compose up -d
 
 # Check status
-docker-compose ps
+docker compose ps
 
 # View logs
-docker-compose logs -f
+docker compose logs -f
 
 # Stop services
-docker-compose down
+docker compose down
 ```
 
 ### 6. Health Checks
@@ -161,12 +163,12 @@ echo '{"client_ip": "10.0.0.1", "domain": "google.com", "qtype": "A", "rtype": "
 
 ```bash
 # All services
-docker-compose logs -f
+docker compose logs -f
 
 # Specific service
-docker-compose logs -f dns-collector
-docker-compose logs -f web-api
-docker-compose logs -f postgres
+docker compose logs -f dns-collector
+docker compose logs -f web-api
+docker compose logs -f postgres
 ```
 
 ### Metrics
@@ -191,26 +193,26 @@ cat backup_file.sql | docker exec -i dns-collector-postgres psql -U dns_collecto
 
 ```bash
 # Stop services
-docker-compose down
+docker compose down
 
 # Backup postgres volume
 docker run --rm -v dns-collector_postgres_data:/data -v $(pwd):/backup alpine tar czf /backup/postgres_data_backup.tar.gz /data
 
 # Start services
-docker-compose up -d
+docker compose up -d
 ```
 
 **For Custom Path (POSTGRES_DATA_PATH set):**
 
 ```bash
 # Stop services
-docker-compose down
+docker compose down
 
 # Backup data directory
 sudo tar czf postgres_data_backup_$(date +%Y%m%d_%H%M%S).tar.gz -C /var/lib/dns-collector postgres
 
 # Start services
-docker-compose up -d
+docker compose up -d
 
 # Restore from backup
 sudo tar xzf postgres_data_backup.tar.gz -C /var/lib/dns-collector
@@ -223,10 +225,10 @@ sudo chown -R 999:999 /var/lib/dns-collector/postgres
 
 ```bash
 # Check PostgreSQL is running
-docker-compose ps postgres
+docker compose ps postgres
 
 # Check PostgreSQL logs
-docker-compose logs postgres
+docker compose logs postgres
 
 # Test connection
 docker exec dns-collector-postgres psql -U dns_collector -d dns_collector -c "SELECT 1;"
@@ -239,7 +241,7 @@ docker exec dns-collector-postgres psql -U dns_collector -d dns_collector -c "SE
 sudo netstat -ulnp | grep 5353
 
 # Check service logs
-docker-compose logs dns-collector
+docker compose logs dns-collector
 
 # Test UDP connectivity
 echo '{"domain": "test.com"}' | nc -u -w1 localhost 5353
@@ -249,10 +251,10 @@ echo '{"domain": "test.com"}' | nc -u -w1 localhost 5353
 
 ```bash
 # Check service status
-docker-compose ps web-api
+docker compose ps web-api
 
 # Check logs
-docker-compose logs web-api
+docker compose logs web-api
 
 # Test health endpoint
 curl http://localhost:8080/health
@@ -262,13 +264,13 @@ curl http://localhost:8080/health
 
 ```bash
 # Pull new images
-docker-compose pull
+docker compose pull
 
 # Recreate containers
-docker-compose up -d
+docker compose up -d
 
 # Check status
-docker-compose ps
+docker compose ps
 ```
 
 ## Security Recommendations

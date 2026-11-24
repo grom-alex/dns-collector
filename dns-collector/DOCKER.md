@@ -1,327 +1,224 @@
-# Docker развертывание DNS Collector
+# Docker-развёртывание dns-collector
 
 ## Требования
 
-- Docker 20.10+
-- Docker Compose 1.29+
+- Docker 24+ и Docker Compose v2 (`docker compose ...`).
+- Свободный UDP-порт 5353.
+- PostgreSQL 16 — в compose или внешний.
 
-## Быстрый старт
+## Сервисы в корневом compose
 
-### 1. Сборка образа
+| Сервис | Образ | Порты | Данные |
+|---|---|---|---|
+| `postgres` | `postgres:16-alpine` | 5432 | volume `postgres_data` |
+| `dns-collector` | `registry.gromas.ru/apps/dns-collector/dns-collector:latest` | 5353/udp | конфиг `./dns-collector/config` |
+| `web-api` | `registry.gromas.ru/apps/dns-collector/web-api:latest` | 8080 | конфиг `./web-api/config` |
 
-```bash
-docker build -t dns-collector:latest .
-```
+Корневой compose использует `pull_policy: always`. Для локальной сборки:
 
-### 2. Запуск с Docker Compose
+~~~bash
+docker compose build dns-collector web-api
+docker compose up -d
+~~~
 
-```bash
-# Создайте директорию для данных
-mkdir -p data
+## Запуск
 
-# Запуск
-docker-compose up -d
+~~~bash
+# из корня репозитория
+docker compose up -d
+docker compose ps
+docker compose logs -f dns-collector
+~~~
 
-# Просмотр логов
-docker-compose logs -f
+Остановка:
 
-# Остановка
-docker-compose down
-```
+~~~bash
+docker compose down          # данные PostgreSQL сохраняются
+docker compose down -v       # удалить volume с данными
+~~~
 
-### 3. Запуск без Docker Compose
+## Запуск только collector
 
-```bash
-# Создайте директорию для данных
-mkdir -p data
+Если PostgreSQL уже есть:
 
-# Запуск контейнера
+~~~bash
 docker run -d \
   --name dns-collector \
-  -p 5353:5353/udp \
-  -v $(pwd)/data:/app/data \
-  -v $(pwd)/config.yaml:/app/config.yaml:ro \
   --restart unless-stopped \
-  dns-collector:latest
+  -p 5353:5353/udp \
+  -p 9090:9090 \
+  -v "$(pwd)/dns-collector/config:/app/config:ro" \
+  -e POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
+  -e POSTGRES_SSL_MODE=disable \
+  registry.gromas.ru/apps/dns-collector/dns-collector:latest
+~~~
 
-# Просмотр логов
-docker logs -f dns-collector
+## Конфигурация
 
-# Остановка
-docker stop dns-collector
-docker rm dns-collector
-```
+Конфиг монтируется только для чтения:
 
-## Конфигурация для Docker
+~~~yaml
+volumes:
+  - ./dns-collector/config:/app/config:ro
+~~~
 
-Измените пути к базам данных в `config.yaml`:
+Внутри контейнера используется `/app/config/config.yaml`. Пароль БД и токен InfluxDB передаются через окружение:
 
-```yaml
-database:
-  domains_db: "/app/data/domains.db"
-  stats_db: "/app/data/stats.db"
-```
+- `POSTGRES_PASSWORD`
+- `POSTGRES_SSL_MODE`
+- `INFLUXDB_TOKEN`
 
-## Тестирование
+После изменения конфига:
 
-### Отправка тестового UDP сообщения
+~~~bash
+docker compose restart dns-collector
+~~~
 
-```bash
-# С хоста
-echo '{"client_ip": "192.168.0.10", "domain": "google.com", "qtype": "A", "rtype": "dns"}' | \
-  nc -u -w1 localhost 5353
+## Метрики
 
-# Или с помощью Python
-python3 test_client.py
-```
+Collector слушает `:9090`:
 
-### Проверка работы
+- `http://localhost:9090/metrics`
+- `http://localhost:9090/health`
 
-```bash
-# Проверка логов
-docker-compose logs dns-collector
+В корневом compose порт 9090 **не опубликован**; добавьте:
 
-# Проверка баз данных
-docker exec dns-collector sqlite3 /app/data/domains.db "SELECT COUNT(*) FROM domain;"
-docker exec dns-collector sqlite3 /app/data/stats.db "SELECT COUNT(*) FROM domain_stat;"
-```
+~~~yaml
+ports:
+  - "9090:9090"
+~~~
 
-## Мониторинг
+или используйте production-compose, где он уже опубликован.
 
-### Просмотр статистики
+## Бэкап PostgreSQL
 
-```bash
-# Войти в контейнер
-docker exec -it dns-collector /bin/sh
+~~~bash
+# Дамп в файл на хосте
+docker compose exec -T postgres \
+  pg_dump -U dns_collector -d dns_collector -Fc \
+  > "backup_$(date +%F).dump"
 
-# Внутри контейнера
-cd /app/data
-sqlite3 domains.db "SELECT * FROM domain LIMIT 10;"
-```
+# Проверка размера
+ls -lh backup_*.dump
+~~~
 
-### Health Check
+Ежедневный cron:
 
-```bash
-# Проверка состояния
-docker inspect --format='{{json .State.Health}}' dns-collector | jq
-```
+~~~bash
+0 2 * * * cd /opt/dns-collector && docker compose exec -T postgres \
+  pg_dump -U dns_collector -d dns_collector -Fc \
+  > "/backups/dns_$(date +%F).dump"
+~~~
 
-## Backup баз данных
+Ротация:
 
-```bash
-# Backup
-docker exec dns-collector sqlite3 /app/data/domains.db ".backup /app/data/domains.db.backup"
-docker exec dns-collector sqlite3 /app/data/stats.db ".backup /app/data/stats.db.backup"
+~~~bash
+find /backups -name 'dns_*.dump' -mtime +30 -delete
+~~~
 
-# Копирование на хост
-docker cp dns-collector:/app/data/domains.db.backup ./backups/
-docker cp dns-collector:/app/data/stats.db.backup ./backups/
-```
+## Восстановление
 
-## Автоматический backup с cron
+~~~bash
+# Остановить пишущие сервисы
+docker compose stop dns-collector web-api
 
-Создайте скрипт `backup.sh`:
+# Пересоздать БД (осторожно: удалит данные)
+docker compose exec -T postgres psql -U dns_collector -d postgres -c "
+DROP DATABASE IF EXISTS dns_collector;"
+docker compose exec -T postgres psql -U dns_collector -d postgres -c "
+CREATE DATABASE dns_collector OWNER dns_collector;"
 
-```bash
-#!/bin/bash
-BACKUP_DIR="./backups/$(date +%Y%m%d)"
-mkdir -p "$BACKUP_DIR"
+# Восстановить дамп
+docker compose exec -T postgres \
+  pg_restore -U dns_collector -d dns_collector --no-owner < backup_2026-11-22.dump
 
-docker exec dns-collector sqlite3 /app/data/domains.db ".backup /app/data/domains.db.backup"
-docker exec dns-collector sqlite3 /app/data/stats.db ".backup /app/data/stats.db.backup"
-
-docker cp dns-collector:/app/data/domains.db.backup "$BACKUP_DIR/"
-docker cp dns-collector:/app/data/stats.db.backup "$BACKUP_DIR/"
-
-# Удаление старых бэкапов (старше 30 дней)
-find ./backups -type d -mtime +30 -exec rm -rf {} +
-
-echo "Backup completed: $BACKUP_DIR"
-```
-
-Добавьте в crontab:
-```bash
-# Бэкап каждый день в 2:00
-0 2 * * * /path/to/backup.sh >> /var/log/dns-collector-backup.log 2>&1
-```
+# Запустить обратно
+docker compose start dns-collector web-api
+~~~
 
 ## Обновление
 
-```bash
-# Остановка
-docker-compose down
+~~~bash
+docker compose pull
+docker compose up -d
+docker compose logs -f dns-collector
+~~~
 
-# Пересборка
-docker build -t dns-collector:latest .
+Миграции применяются при старте. Перед обновлением сделайте бэкап. Если миграция неуспешна — верните предыдущий тег образа и восстановите дамп.
 
-# Запуск
-docker-compose up -d
-```
+## Логи и диагностика
+
+~~~bash
+docker compose logs --tail=200 dns-collector
+docker compose logs -f web-api
+docker stats --no-stream
+docker inspect dns-collector-postgres --format '{{json .State.Health}}'
+~~~
+
+Логи ограничены в compose: `max-size: 50m`, `max-file: 5` (production) и `10m/3` (dev).
+
+## Проверка БД
+
+~~~bash
+docker compose exec -T postgres psql -U dns_collector -d dns_collector -c "
+SELECT count(*) AS domains FROM domain;"
+
+docker compose exec -T postgres psql -U dns_collector -d dns_collector -c "
+SELECT count(*) AS requests FROM domain_stat;"
+
+docker compose exec -T postgres psql -U dns_collector -d dns_collector -c "
+SELECT domain, count(*) FROM domain_stat
+GROUP BY domain ORDER BY count(*) DESC LIMIT 10;"
+~~~
 
 ## Troubleshooting
 
 ### Контейнер не запускается
 
-```bash
-# Проверка логов
-docker logs dns-collector
+~~~bash
+docker compose logs dns-collector
+docker compose config
+~~~
 
-# Проверка конфигурации
-docker run --rm -v $(pwd)/config.yaml:/app/config.yaml dns-collector:latest cat /app/config.yaml
-```
+Частые причины: нет доступа к PostgreSQL, неверный пароль, занят UDP-порт, миграция упала.
+
+### `failed to ping database`
+
+- В compose host должен быть `postgres`, а не `localhost`.
+- Проверьте `POSTGRES_PASSWORD` и `POSTGRES_SSL_MODE`.
+- Проверьте healthcheck PostgreSQL.
 
 ### Порт занят
 
-```bash
-# Проверка, что порт свободен
-sudo netstat -tulpn | grep 5353
+~~~bash
+sudo ss -ulnp | grep 5353
+~~~
 
-# Или измените порт в docker-compose.yml
+Измените внешний порт в compose:
+
+~~~yaml
 ports:
-  - "5454:5353/udp"  # Внешний порт 5454
-```
+  - "5454:5353/udp"
+~~~
 
-### Проблемы с правами доступа
+и `server.udp_port` в конфиге, если меняете внутренний.
 
-```bash
-# Проверка владельца директории data
-ls -la data/
+### Права на конфиг
 
-# Изменение владельца
-sudo chown -R $(id -u):$(id -g) data/
-```
+Конфиг монтируется read-only; убедитесь, что файл читается пользователем `dnscollector` (UID 1000) внутри контейнера.
 
-## Производительность
+## Ограничения ресурсов
 
-### Ограничение ресурсов
+В compose уже заданы `deploy.resources`. Для VM с 16 ГБ:
 
-В `docker-compose.yml` можно настроить:
+- PostgreSQL: 2 CPU / 4–8 ГБ RAM;
+- collector: 1–2 CPU / 512 МБ;
+- web-api: 1 CPU / 512 МБ.
 
-```yaml
-deploy:
-  resources:
-    limits:
-      cpus: '2.0'      # Максимум 2 CPU
-      memory: 1G       # Максимум 1GB RAM
-    reservations:
-      cpus: '0.5'      # Минимум 0.5 CPU
-      memory: 256M     # Минимум 256MB RAM
-```
+## Безопасность
 
-### Мониторинг ресурсов
-
-```bash
-# Статистика контейнера
-docker stats dns-collector
-
-# Детальная информация
-docker inspect dns-collector
-```
-
-## Multi-platform сборка
-
-Для сборки образа под разные архитектуры (amd64, arm64):
-
-```bash
-# Создание buildx builder
-docker buildx create --name multiarch --use
-
-# Сборка и push для нескольких платформ
-docker buildx build \
-  --platform linux/amd64,linux/arm64 \
-  -t yourusername/dns-collector:latest \
-  --push \
-  .
-```
-
-## Интеграция с Docker Swarm
-
-Для развертывания в Docker Swarm создайте `docker-stack.yml`:
-
-```yaml
-version: '3.8'
-
-services:
-  dns-collector:
-    image: dns-collector:latest
-    ports:
-      - "5353:5353/udp"
-    volumes:
-      - dns-data:/app/data
-    configs:
-      - source: dns-config
-        target: /app/config.yaml
-    deploy:
-      replicas: 3
-      restart_policy:
-        condition: on-failure
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 512M
-
-volumes:
-  dns-data:
-
-configs:
-  dns-config:
-    file: ./config.yaml
-```
-
-Развертывание:
-```bash
-docker stack deploy -c docker-stack.yml dns-collector-stack
-```
-
-## Kubernetes (опционально)
-
-Пример deployment для Kubernetes:
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: dns-collector
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: dns-collector
-  template:
-    metadata:
-      labels:
-        app: dns-collector
-    spec:
-      containers:
-      - name: dns-collector
-        image: dns-collector:latest
-        ports:
-        - containerPort: 5353
-          protocol: UDP
-        volumeMounts:
-        - name: config
-          mountPath: /app/config.yaml
-          subPath: config.yaml
-        - name: data
-          mountPath: /app/data
-      volumes:
-      - name: config
-        configMap:
-          name: dns-collector-config
-      - name: data
-        persistentVolumeClaim:
-          claimName: dns-collector-pvc
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: dns-collector-service
-spec:
-  type: LoadBalancer
-  ports:
-  - port: 5353
-    protocol: UDP
-    targetPort: 5353
-  selector:
-    app: dns-collector
-```
+- Не публикуйте PostgreSQL (5432) наружу без необходимости.
+- Смените дефолтный пароль `dns_collector_pass`.
+- web-api не имеет встроенной аутентификации: ставьте за reverse proxy с auth (см. план).
+- UDP-порт 5353 ограничьте на фаерволе адресом pfSense/Unbound.
+- Collector работает non-root; web-api в текущем Dockerfile — от root (исправление в плане).

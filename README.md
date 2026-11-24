@@ -34,13 +34,13 @@
 
 ```bash
 # Запуск всех сервисов (PostgreSQL, dns-collector, web-api)
-docker-compose up -d
+docker compose up -d
 
 # Проверка статуса
-docker-compose ps
+docker compose ps
 
 # Просмотр логов
-docker-compose logs -f
+docker compose logs -f
 
 # Web-интерфейс доступен по адресу
 http://localhost:8080
@@ -51,8 +51,8 @@ curl http://localhost:8080/health
 
 **Системные требования:**
 - Docker и Docker Compose
-- Порты 5353/udp (DNS collector), 8080 (Web UI), 5432 (PostgreSQL)
-- Минимум 1GB RAM
+- Порты 5353/udp (DNS collector), 8080 (Web UI); 5432 (PostgreSQL) — только если нужен внешний доступ к БД
+- Минимум 2 GB RAM (PostgreSQL + два сервиса); для production — 8–16 GB
 
 Подробнее: [QUICKSTART_WEBAPI.md](QUICKSTART_WEBAPI.md)
 
@@ -64,7 +64,7 @@ git clone git@github.com:grom-alex/dns-collector.git
 cd dns-collector
 
 # Запустить с помощью Docker Compose (рекомендуется)
-docker-compose up -d
+docker compose up -d
 
 # Или собрать локально
 cd dns-collector
@@ -79,6 +79,8 @@ go build -o dns-collector ./cmd/dns-collector
 ```yaml
 server:
   udp_port: 5353
+  udp_workers: 16
+  udp_queue_size: 4096
 
 database:
   host: "postgres"       # Хост PostgreSQL
@@ -95,6 +97,7 @@ resolver:
   workers: 5            # Количество параллельных воркеров
   cyclic_resolv: true    # Циклический режим резолвинга (рекомендуется)
   resolv_cooldown_mins: 240  # Cooldown между циклами (4 часа)
+  ip_refresh_hours: 24   # Обновлять time неизменных IP не чаще раза в сутки
 
 logging:
   level: "info"  # Уровень логирования (debug, info, warn, error)
@@ -205,7 +208,7 @@ cp .env.example .env
 nano .env
 
 # Запустите сервисы
-docker-compose up -d
+docker compose up -d
 ```
 
 **Особенности production конфигурации:**
@@ -223,6 +226,13 @@ docker-compose up -d
 - [QUICKSTART_WEBAPI.md](QUICKSTART_WEBAPI.md) - быстрый старт с веб-интерфейсом
 - [DEPLOYMENT.md](DEPLOYMENT.md) - production развертывание
 - [SERVICES.md](SERVICES.md) - архитектура микросервисов
+- [CONTRIBUTING.md](CONTRIBUTING.md) - порядок ветвления, PR, тестов, релиза и деплоя
+- [TESTING.md](TESTING.md) - тесты и покрытие
+- [docs/OPTIMIZATION_PLAN.md](docs/OPTIMIZATION_PLAN.md) - план оптимизации БД и устранения недостатков
+- [docs/DB_BASELINE.md](docs/DB_BASELINE.md) - опорный срез нагрузки на БД от 2026-11-23
+- [docs/DB_STATISTICS.md](docs/DB_STATISTICS.md) - pg_stat_statements: включение, запросы, первый срез
+- [docs/DB_MONITORING.md](docs/DB_MONITORING.md) - 24-часовой мониторинг PostgreSQL и гайд по анализу
+- [docs/DB_MONITORING_REPORT.md](docs/DB_MONITORING_REPORT.md) - результаты 24-часового профиля
 - [CHANGELOG.md](CHANGELOG.md) - история изменений
 
 ### DNS Collector

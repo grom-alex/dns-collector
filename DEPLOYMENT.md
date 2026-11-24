@@ -5,19 +5,19 @@
 - **Development**: See [QUICKSTART_WEBAPI.md](QUICKSTART_WEBAPI.md)
 - **Production**: See [deploy/production/README.md](deploy/production/README.md)
 
-## Version 2.0.0
+## Version 2.8.0
 
-Latest release with PostgreSQL backend.
+Latest release with PostgreSQL backend. Процесс релиза и деплоя — в [CONTRIBUTING.md](CONTRIBUTING.md#6-версии-релиз-публикация) и [CONTRIBUTING.md](CONTRIBUTING.md#7-деплой).
 
 ### Docker Images
 
 ```bash
 # DNS Collector
-registry.gromas.ru/apps/dns-collector/dns-collector:2.0.0
+registry.gromas.ru/apps/dns-collector/dns-collector:2.8.0
 registry.gromas.ru/apps/dns-collector/dns-collector:latest
 
 # Web API
-registry.gromas.ru/apps/dns-collector/web-api:2.0.0
+registry.gromas.ru/apps/dns-collector/web-api:2.8.0
 registry.gromas.ru/apps/dns-collector/web-api:latest
 ```
 
@@ -31,7 +31,7 @@ git clone git@github.com:grom-alex/dns-collector.git
 cd dns-collector
 
 # Start all services
-docker-compose up -d
+docker compose up -d
 
 # Access web interface
 open http://localhost:8080
@@ -54,7 +54,7 @@ nano config/dns-collector.yaml
 nano config/web-api.yaml
 
 # Deploy
-docker-compose up -d
+docker compose up -d
 ```
 
 **Important**: See [deploy/production/README.md](deploy/production/README.md) for:
@@ -132,12 +132,12 @@ echo '{"domain": "test.com", "client_ip": "127.0.0.1"}' | nc -u -w1 localhost 53
 
 ```bash
 # All services
-docker-compose logs -f
+docker compose logs -f
 
 # Specific service
-docker-compose logs -f dns-collector
-docker-compose logs -f web-api
-docker-compose logs -f postgres
+docker compose logs -f dns-collector
+docker compose logs -f web-api
+docker compose logs -f postgres
 ```
 
 ### Metrics

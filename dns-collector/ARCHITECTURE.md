@@ -1,379 +1,294 @@
-# Архитектура DNS Collector
+# Архитектура dns-collector
 
-## Общая схема работы
+Документ описывает **текущее** состояние сервиса: как устроен приём запросов, резолвинг, хранение и очистка данных. Планы по изменению схемы и снижению нагрузки на диск вынесены в [../docs/OPTIMIZATION_PLAN.md](../docs/OPTIMIZATION_PLAN.md).
 
-```
-┌─────────────────┐
-│  DNS Clients    │
-│ (UDP requests)  │
-└────────┬────────┘
-         │ JSON {"client_ip": ..., "domain": ..., ...}
-         ▼
-┌─────────────────────────────────────────┐
-│         UDP Server (port 5353)          │
-│  • Принимает JSON сообщения             │
-│  • Валидация данных                     │
-└────────┬────────────────────────────────┘
-         │
-         ├─────────────────┐
-         ▼                 ▼
-┌──────────────────┐  ┌────────────────────┐
-│   domains.db     │  │    stats.db        │
-│                  │  │                    │
-│  ┌────────────┐  │  │  ┌──────────────┐  │
-│  │  domain    │  │  │  │ domain_stat  │  │
-│  │  table     │  │  │  │  table       │  │
-│  └────────────┘  │  │  └──────────────┘  │
-│  ┌────────────┐  │  │                    │
-│  │   ip       │  │  │  • Каждый запрос   │
-│  │   table    │  │  │  • Статистика      │
-│  └────────────┘  │  └────────────────────┘
-└──────────────────┘
-         │
-         │
-         ▼
-┌─────────────────────────────────────────┐
-│      DNS Resolver (Worker Pool)         │
-│  • Периодическая задача                 │
-│  • Выбор доменов для резолвинга         │
-│  • Параллельные DNS запросы             │
-│  • Обновление IP таблицы                │
-└─────────────────────────────────────────┘
-         │
-         ▼
-┌─────────────────────────────────────────┐
-│         External DNS Servers            │
-│         (система DNS)                   │
-└─────────────────────────────────────────┘
-```
+## 1. Место в системе
 
-## Компоненты системы
+~~~text
+┌──────────────┐   DNS-запросы    ┌──────────────────┐
+│  Клиенты     │ ───────────────▶ │ Unbound (pfSense)│
+└──────────────┘                  └────────┬─────────┘
+                                           │ Python-модуль
+                                           │ UDP JSON :5353
+                                           ▼
+                                  ┌──────────────────┐
+                                  │  dns-collector   │
+                                  │  UDP + resolver  │
+                                  │  cleanup + metrics│
+                                  └────────┬─────────┘
+                                           │ SQL
+                                           ▼
+                                  ┌──────────────────┐
+                                  │   PostgreSQL 16  │
+                                  └────────┬─────────┘
+                                           │ SQL (read)
+                                           ▼
+                                  ┌──────────────────┐
+                                  │     web-api      │
+                                  │ Gin + Vue + Excel│
+                                  └────────┬─────────┘
+                                           │ HTTP :8080
+                                           ▼
+                                  ┌──────────────────┐
+                                  │   Браузер / API  │
+                                  └──────────────────┘
+~~~
 
-### 1. UDP Server (`internal/server/udp.go`)
+- `dns-collector` — приём UDP, запись в PostgreSQL, резолвинг, retention.
+- `web-api` — чтение данных PostgreSQL, REST API и веб-интерфейс; при старте применяет миграции (DDL).
+- PostgreSQL — единственное общее хранилище; файловых БД больше нет.
+- Unbound-модуль — [../unbound/python_dns_forwarder.py](../unbound/python_dns_forwarder.py).
 
-**Назначение**: Прием DNS запросов от клиентов через UDP протокол
+## 2. Компоненты
 
-**Функции**:
-- Прослушивание UDP порта
-- Парсинг JSON сообщений
-- Валидация входящих данных
-- Асинхронная обработка сообщений
-- Сохранение в базы данных
+| Компонент | Файл | Ответственность |
+|---|---|---|
+| Точка входа | `cmd/dns-collector/main.go` | конфиг, БД, миграции, запуск/остановка сервисов |
+| UDP-сервер | `internal/server/udp.go` | приём JSON, валидация, ограниченный пул воркеров |
+| Event writer | `internal/writer/writer.go` | кэш доменов, батчинг `domain_stat`, троттлинг `last_seen` |
+| Резолвер | `internal/resolver/resolver.go` | выборка доменов, DNS-lookup, upsert IP |
+| Слой БД | `internal/database/database.go` | SQL, upsert, выборки, очистка |
+| Миграции | `internal/database/migrations.go` + `migrations/*.sql` | схема и версии |
+| Retention | `internal/cleanup/cleanup.go` | удаление старых статистик/IP/доменов |
+| Метрики | `internal/metrics/*` | Prometheus, InfluxDB, сбор размеров БД |
+| Конфиг | `internal/config/config.go` | YAML, env-overrides, валидация |
 
-**Формат входящего сообщения**:
-```json
+## 3. Приём UDP-запросов
+
+### 3.1. Формат
+
+~~~json
 {
   "client_ip": "192.168.0.10",
   "domain": "google.com",
-  "qtype": "A",
-  "rtype": "dns"
+  "qtype": "AAAA",
+  "rtype": "cache"
 }
-```
+~~~
 
-**Поток обработки**:
-1. Получение UDP пакета
-2. Десериализация JSON
-3. Валидация (обязательное поле: domain)
-4. Запись в `domain_stat` (статистика)
-5. Вставка/получение записи в `domain`
+- `domain` обязателен; пустой отбрасывается.
+- `client_ip` при отсутствии заменяется на `unknown`.
+- `rtype` при отсутствии заменяется на `unknown`.
+- `qtype` принимается, но пока не используется.
 
-### 2. Database Layer (`internal/database/database.go`)
+### 3.2. Обработка
 
-**Назначение**: Работа с SQLite базами данных
+1. `ReadFromUDP` читает датаграмму в буфер 4096 байт.
+2. Данные копируются в новый срез (буфер переиспользуется).
+3. Пакет кладётся в ограниченную очередь `server.udp_queue_size`; её разбирает пул из `server.udp_workers` воркеров. При переполнении пакет отбрасывается и учитывается в `dns_server_messages_dropped_total{reason="udp_queue_full"}`.
+4. `trimInvalidJSONSuffix` отрезает мусор после последней `}` (костыль под реальные пакеты Unbound).
+5. `json.Unmarshal` и валидация; при ошибке — лог и метрика `invalid`.
+6. `writer.Submit`:
+   - domain ID ищется в LRU-кэше (`domain -> id`, TTL 24h);
+   - при промахе — один `InsertOrGetDomain` (и запись в кэш);
+   - строка статистики ставится в очередь и пишется батчем 500 строк / 1s;
+   - `last_seen` агрегируется в памяти и сбрасывается батчем раз в 60s (не чаще 5 минут на домен).
+7. Метрики: `valid`/`invalid`, `rtype`, время обработки, новые домены, dropped.
 
-#### Структура domains.db
+Ключевая особенность: **на каждый пакет больше нет 3–4 SQL-запросов**. В штатном режиме (cache hit) пакет не делает SQL вообще: он попадает в очередь статистики и в in-memory `last_seen`. SQL выполняется только на промахе кэша и при плановом flush. Подробный разбор — в [плане](../docs/OPTIMIZATION_PLAN.md#21-карта-горячего-пути).
 
-**Таблица `domain`**:
-```sql
+### 3.3. Обработка ошибок
+
+- `defer recover()` в `handleMessage` защищает процесс от паники при неожиданном JSON.
+- Ошибки БД логируются и не прерывают приём.
+- При переполнении очереди пакет отбрасывается; это сознательный backpressure вместо неограниченного роста памяти.
+- Батч статистики при ошибке БД логируется и теряется; `last_seen` при ошибке возвращается в карту и повторяется на следующем flush.
+
+## 4. Резолвер
+
+### 4.1. Запуск
+
+- При старте создаётся `net.Resolver` с `PreferGo: true` и таймаутом из конфига.
+- Первый батч запускается сразу, далее — по тикеру `interval_seconds`.
+- На каждый тик запускается новая горутина `runResolution`; защиты от наложения батчей нет.
+
+### 4.2. Выборка доменов
+
+`GetDomainsToResolve(limit, cyclicMode, cooldownMins)`:
+
+~~~sql
+-- cyclic_resolv: true
+SELECT ... FROM domain
+WHERE resolv_count < max_resolv
+   OR (resolv_count >= max_resolv AND last_resolv_time < $1)
+ORDER BY last_resolv_time ASC
+LIMIT $2;
+~~~
+
+- Размер батча: `workers × 10`.
+- В циклическом режиме сброс счётчика происходит при `resolv_count >= max_resolv - 1` в значение `⌊max_resolv × 2/3⌋`, поэтому домен **никогда не достигает** `max_resolv`. Ветка `resolv_count >= max_resolv` и cooldown на практике недостижимы — это отмечено и в коде, и в CHANGELOG.
+- Следствие: все домены постоянно остаются кандидатами на резолв, пока работает тикер.
+
+### 4.3. Резолвинг
+
+Для каждого домена:
+
+1. IPv4 и IPv6 получают **отдельные контексты** с таймаутом `timeout_seconds`.
+2. `LookupIP(ctx4, "ip4", domain)` и `LookupIP(ctx6, "ip6", domain)`.
+3. Результат каждого успешного lookup передаётся в `UpsertIPs`:
+   - новые адреса вставляются (`ON CONFLICT DO NOTHING`);
+   - для вернувшихся адресов `time` обновляется не чаще `ip_refresh_hours` (по умолчанию 24h);
+   - адреса, которые больше не возвращаются, не обновляются и удаляются штатным retention по TTL, а не немедленным DELETE (защита от round-robin/CDN churn).
+4. `UpdateDomainResolvStats` — инкремент `resolv_count` и `last_resolv_time` (в циклическом режиме — сброс на 2/3).
+5. Логи — только ошибки; логи на каждый домен/IP удалены.
+
+Резолвинг идёт через системный резолвер (`/etc/resolv.conf`); отдельной настройки upstream DNS нет.
+
+## 5. Retention и очистка
+
+`internal/cleanup/cleanup.go` запускается сразу при старте и далее раз в `cleanup_interval_hours`.
+
+| Что | Параметр | Логика |
+|---|---|---|
+| Статистика | `stats_days` (по умолчанию 30, максимум 365) | `DELETE FROM domain_stat WHERE timestamp < cutoff` |
+| IP-адреса | `ip_ttl_days` (по умолчанию 3, максимум 90) | `DELETE FROM ip WHERE time < cutoff AND domain_id IN (SELECT id FROM domain WHERE last_seen >= cutoff)` — только у активных доменов |
+| Домены | `domain_ttl_days` (0 = выключено, максимум 365) | удаляются домены с `last_seen IS NOT NULL` и старше cutoff; IP удаляются в той же транзакции |
+
+Особенности текущей реализации:
+
+- `ip_ttl_days = 0` в коде превращается в 3 (см. `config.go`); «отключить» очистку IP значением 0 нельзя. Это исправляется в [плане](../docs/OPTIMIZATION_PLAN.md#этап-7-web-api-и-экспорт-2-дня).
+- Домены с `last_seen IS NULL` (никогда не запрашивались клиентами) не удаляются по TTL.
+- `DELETE` по `domain_stat` — массовая операция; при больших объёмах она создаёт dead tuples и bloat. Переход на партиции — в [плане](../docs/OPTIMIZATION_PLAN.md#этап-3-партиционирование-domain_stat-3-дня).
+
+## 6. Схема БД
+
+### 6.1. Таблицы
+
+~~~sql
 CREATE TABLE domain (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     domain TEXT NOT NULL UNIQUE,
-    time_insert DATETIME NOT NULL,
+    time_insert TIMESTAMP NOT NULL,
     resolv_count INTEGER NOT NULL DEFAULT 0,
     max_resolv INTEGER NOT NULL,
-    last_resolv_time DATETIME NOT NULL
+    last_resolv_time TIMESTAMP NOT NULL,
+    last_seen TIMESTAMP
 );
-```
 
-- `id` - уникальный идентификатор
-- `domain` - доменное имя (уникальное)
-- `time_insert` - время первой вставки
-- `resolv_count` - счетчик выполненных резолвингов
-- `max_resolv` - максимальное количество резолвингов (из конфига)
-- `last_resolv_time` - время последнего резолвинга
-
-**Таблица `ip`**:
-```sql
 CREATE TABLE ip (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    domain_id INTEGER NOT NULL,
+    id SERIAL PRIMARY KEY,
+    domain_id INTEGER NOT NULL REFERENCES domain(id) ON DELETE CASCADE,
     ip TEXT NOT NULL,
     type TEXT NOT NULL,
-    time DATETIME NOT NULL,
-    UNIQUE(domain_id, ip),
-    FOREIGN KEY(domain_id) REFERENCES domain(id)
+    time TIMESTAMP NOT NULL,
+    UNIQUE (domain_id, ip)
 );
-```
 
-- `id` - уникальный идентификатор
-- `domain_id` - FK на таблицу domain
-- `ip` - IP адрес
-- `type` - тип адреса (ipv4/ipv6)
-- `time` - время вставки/обновления
-- **Уникальность**: пара (domain_id, ip)
-
-#### Структура stats.db
-
-**Таблица `domain_stat`**:
-```sql
 CREATE TABLE domain_stat (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     domain TEXT NOT NULL,
     client_ip TEXT NOT NULL,
     rtype TEXT NOT NULL,
-    timestamp DATETIME NOT NULL
+    timestamp TIMESTAMP NOT NULL
 );
-```
+~~~
 
-- `id` - уникальный идентификатор
-- `domain` - доменное имя из запроса
-- `client_ip` - IP клиента
-- `rtype` - тип резолвинга (cache/dns/etc)
-- `timestamp` - время запроса
+### 6.2. Индексы
 
-#### Основные операции
+- `domain`: PK, `UNIQUE(domain)`, `(resolv_count, max_resolv)`, `(last_seen)`, `(last_resolv_time)`, `(time_insert)`, partial-индексы по `resolv_count`.
+- `ip`: PK, `UNIQUE(domain_id, ip)`, `(domain_id)`, `(type)`, `(time)`, `(ip)`, `(domain_id, type)`.
+- `domain_stat`: `(timestamp DESC)`, `(client_ip)`, `(domain)`, `(rtype)`, `(timestamp DESC, client_ip)`, `(timestamp DESC, domain)`.
 
-**InsertOrGetDomain**:
-- INSERT OR IGNORE для атомарности
-- Возвращает существующую или новую запись
-- Устанавливает начальные значения из конфига
+Часть индексов дублирует друг друга или стоит на обновляемых столбцах: `idx_domain_name` дублирует уникальный индекс, `idx_ip_time` дублирует `idx_ip_time_cleanup`, а индексы по `resolv_count`, `last_resolv_time`, `last_seen`, `ip.time`, `ip.type` запрещают HOT. Их стоимость и план удаления — в [плане](../docs/OPTIMIZATION_PLAN.md#22-индексы-которые-убивают-hot).
 
-**GetDomainsToResolve**:
-- Выбирает домены где `resolv_count < max_resolv`
-- Сортировка по `last_resolv_time ASC` (старые первыми)
-- Ограничение по количеству (batch)
+### 6.3. Управление схемой
 
-**InsertOrUpdateIP**:
-- INSERT ... ON CONFLICT DO UPDATE
-- Обновляет время при повторной вставке
-- Уникальность по паре (domain_id, ip)
+- `database.New()` вызывает `initSchema()`, который создаёт таблицы и часть индексов через `CREATE TABLE IF NOT EXISTS`.
+- Затем `RunMigrations()` применяет встроенные миграции `000001–000004`.
+- На свежей БД фактическая схема определяется `initSchema()` (например, `domain.domain` — `TEXT`, а не `VARCHAR(255)`), миграции лишь фиксируют версию.
+- В web-api есть **своя копия** тех же миграций; какой сервис стартует первым, тот и создаёт схему.
+- Миграция `000003` содержит `ALTER DATABASE dns_collector` и `jit = on` — жёсткая привязка к имени БД и спорная настройка.
 
-**UpdateDomainResolvStats**:
-- Инкремент `resolv_count`
-- Обновление `last_resolv_time`
+## 7. Поток записи и нагрузка на диск
 
-### 3. DNS Resolver (`internal/resolver/resolver.go`)
+| Операция | Когда | Объём |
+|---|---|---|
+| `INSERT/SELECT domain` | только при промахе кэша `domain -> id` | 1–2 запроса на новый/редкий домен |
+| `INSERT domain_stat` | батчем из очереди | 500 строк / 1s |
+| `UPDATE domain.last_seen` | батчем раз в 60s | не чаще 5 минут на домен |
+| `INSERT ... ON CONFLICT DO NOTHING` + условный `UPDATE ip.time` | пул адресов при резолве | новые + refresh раз в `ip_refresh_hours` |
+| `UPDATE domain.resolv_count/last_resolv_time` | каждый домен при каждом резолве | 1 строка + индексы |
+| `DELETE domain_stat` | раз в сутки | до сотен тысяч строк |
+| `DELETE ip/domain` | раз в сутки | меньше |
 
-**Назначение**: Периодический резолвинг доменных имен в IP адреса
+Основные оставшиеся причины избыточной записи:
 
-**Архитектура**:
-- Периодический тикер (configurable interval)
-- Пул воркеров для параллельной обработки
-- Таймауты для DNS запросов
-- Резолвинг IPv4 и IPv6
+1. `domain.resolv_count` и `last_resolv_time` обновляются на каждый резолв, а индексы по ним запрещают HOT.
+2. `domain_stat` — не партиционированная churn-таблица с шестью индексами: INSERT на каждый пакет и массовый DELETE по retention.
+3. `ip.time` всё ещё обновляется раз в сутки на каждый вернувшийся IP; индексы по `time`/`type` препятствуют HOT.
+4. `domain_stat` и `ip` остаются раздутыми; индексы занимают ~93% БД.
 
-**Алгоритм работы**:
+Что уже сделано в этапе 1: кэш доменов, батчинг статистики, троттлинг `last_seen`, upsert IP без перезаписи неизменных адресов и ограниченный пул воркеров. Следующие шаги — индексы, `fillfactor`, партиционирование и тюнинг PostgreSQL.
 
-```
-1. Тикер срабатывает каждые N секунд
-   │
-   ▼
-2. Выбор доменов из БД (resolv_count < max_resolv)
-   │
-   ▼
-3. Распределение по пулу воркеров
-   │
-   ▼
-4. Для каждого домена (параллельно):
-   ├─▶ DNS запрос IPv4 (LookupIP "ip4")
-   ├─▶ DNS запрос IPv6 (LookupIP "ip6")
-   ├─▶ Вставка/обновление IP в базе
-   └─▶ Обновление счетчиков domain
-   │
-   ▼
-5. Ожидание завершения всех воркеров
-   │
-   ▼
-6. Завершение задачи, ожидание следующего тика
-```
+Цифры, замеры и пошаговый план — в [docs/OPTIMIZATION_PLAN.md](../docs/OPTIMIZATION_PLAN.md).
 
-**Worker Pool**:
-- Количество воркеров настраивается в конфиге
-- Канал для распределения доменов
-- WaitGroup для синхронизации
+## 8. Метрики
 
-**DNS Resolution**:
-```go
-// IPv4
-ipv4Addrs, err := resolver.LookupIP(ctx, "ip4", domain)
+При `metrics.enabled: true`:
 
-// IPv6
-ipv6Addrs, err := resolver.LookupIP(ctx, "ip6", domain)
-```
+- HTTP-сервер на `:9090`: `/metrics`, `/health`.
+- Prometheus-метрики:
+  - `dns_server_messages_received_total{status}`, `dns_server_messages_dropped_total{reason}`, `dns_server_domains_received_total{rtype}`, `dns_server_new_domains_total`, `dns_server_processing_duration_seconds`;
+  - `dns_resolver_lookups_total{ip_version,status}`, `dns_resolver_lookup_duration_seconds{ip_version}`, `dns_resolver_domains_processed_total{status}`, `dns_resolver_batch_size`, `dns_resolver_active_workers`;
+  - `dns_cleanup_*` — удалённые строки, длительность, количество запусков;
+  - `dns_db_domains_total`, `dns_db_ips_total` — обновляются раз в 30 с.
+- Go runtime и process-метрики.
+- Опционально — push в InfluxDB 2 (интервал `interval_seconds`).
 
-**Обработка результатов**:
-- Даже при ошибке резолвинга инкрементируем счетчик
-- Это предотвращает бесконечные попытки для несуществующих доменов
-- При достижении max_resolv домен больше не обрабатывается
+## 9. Конфигурация
 
-### 4. Configuration (`internal/config/config.go`)
+| Секция | Ключи |
+|---|---|
+| `server` | `udp_port`, `udp_workers`, `udp_queue_size` |
+| `database` | `host`, `port`, `user`, `password`, `database`, `ssl_mode` |
+| `resolver` | `interval_seconds`, `max_resolv`, `timeout_seconds`, `workers`, `cyclic_resolv`, `resolv_cooldown_mins`, `ip_refresh_hours` |
+| `logging` | `level` (в collector фактически не применяется) |
+| `retention` | `stats_days`, `cleanup_interval_hours`, `ip_ttl_days`, `domain_ttl_days` |
+| `metrics` | `enabled`, `port`, `path`, `influxdb` |
 
-**Назначение**: Загрузка и валидация конфигурации из YAML
+Переопределения из окружения: `POSTGRES_PASSWORD`, `POSTGRES_SSL_MODE`, `INFLUXDB_TOKEN`.
 
-**Параметры**:
+Валидация при старте: порт UDP, интервал резолвера, `max_resolv`, retention-границы (30/365 дней, 168 ч, 90 дней), порт и путь метрик.
 
-```yaml
-server:
-  udp_port: 5353               # UDP порт сервера
+## 10. Развёртывание
 
-database:
-  domains_db: "domains.db"     # Путь к БД доменов
-  stats_db: "stats.db"         # Путь к БД статистики
+- Docker multi-stage: сборка на `golang:1.24-bookworm`, runtime — `debian:bookworm-slim`, non-root пользователь `dnscollector`.
+- Конфиг монтируется в `/app/config/config.yaml` (только чтение).
+- Миграции применяются при старте; при ошибке миграции процесс завершается.
+- В корневом `docker-compose.yml` опубликован только `5353/udp`; PostgreSQL — `5432`; web-api — `8080`. Порт метрик 9090 в корневом compose не публикуется (в production — публикуется).
+- Healthcheck контейнера collector отсутствует; web-api проверяется через `/health`.
 
-resolver:
-  interval_seconds: 300        # Период резолвинга (сек)
-  max_resolv: 10              # Max резолвингов на домен
-  timeout_seconds: 5          # Таймаут DNS запроса
-  workers: 5                  # Количество воркеров
+## 11. Известные ограничения
 
-logging:
-  level: "info"               # Уровень логирования
-```
+- Нет аутентификации на UDP-приёмнике: любой, кто видит порт, может прислать произвольные `domain`/`client_ip`.
+- UDP-воркеры и очередь ограничены, но при переполнении пакеты дропаются (метрика `dns_server_messages_dropped_total`).
+- Батчи резолвера могут накладываться; контексты IPv4/IPv6 раздельные.
+- Остаются `UPDATE domain` на каждый резолв и массовые `DELETE domain_stat`; индексы на обновляемых столбцах всё ещё препятствуют HOT.
+- Батч статистики при ошибке БД логируется и теряется (счётчика потерь пока нет).
+- `domain_stat` не партиционирована, retention через массовый `DELETE`.
+- `initSchema` и миграции дублируют друг друга; схема зависит от порядка запуска сервисов.
+- `ALTER DATABASE dns_collector` в миграции 000003.
+- Экспорт в web-api ограничен памятью контейнера; `IN (...)` может превысить лимит параметров PostgreSQL.
+- `logging.level` в collector не используется.
 
-**Валидация**:
-- Проверка диапазона UDP порта (1-65535)
-- Проверка положительности значений
-- Установка значений по умолчанию
+Полный перечень и приоритеты — в [docs/OPTIMIZATION_PLAN.md](../docs/OPTIMIZATION_PLAN.md).
 
-### 5. Main Application (`cmd/dns-collector/main.go`)
+## 12. Карта файлов
 
-**Назначение**: Точка входа, инициализация и координация компонентов
-
-**Последовательность запуска**:
-1. Парсинг флагов командной строки
-2. Загрузка конфигурации
-3. Инициализация баз данных
-4. Запуск UDP сервера
-5. Запуск DNS resolver
-6. Ожидание сигнала завершения
-7. Graceful shutdown
-
-**Graceful Shutdown**:
-```go
-signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
-<-sigCh
-// Остановка компонентов в обратном порядке
-```
-
-## Потоки данных
-
-### Поток 1: Прием DNS запроса
-
-```
-Client
-  │
-  │ UDP: {"client_ip":"...", "domain":"...", ...}
-  ▼
-UDP Server
-  │
-  ├─▶ Parse JSON
-  ├─▶ Validate
-  │
-  ├─▶ INSERT INTO domain_stat (domain, client_ip, rtype, timestamp)
-  │   (stats.db)
-  │
-  └─▶ INSERT OR IGNORE INTO domain (domain, time_insert, ...)
-      (domains.db)
-```
-
-### Поток 2: DNS Резолвинг
-
-```
-Timer Tick (every N seconds)
-  │
-  ▼
-SELECT domain FROM domain WHERE resolv_count < max_resolv
-  │
-  ▼
-Worker Pool (parallel processing)
-  │
-  ├─▶ Worker 1: domain1 → DNS Lookup → INSERT/UPDATE ip
-  ├─▶ Worker 2: domain2 → DNS Lookup → INSERT/UPDATE ip
-  ├─▶ Worker 3: domain3 → DNS Lookup → INSERT/UPDATE ip
-  └─▶ ...
-  │
-  ▼
-For each domain:
-  UPDATE domain SET resolv_count++, last_resolv_time=now
-```
-
-## Особенности реализации
-
-### Конкурентность
-
-1. **UDP Server**: каждое сообщение обрабатывается в отдельной горутине
-2. **Resolver**: пул воркеров с каналами для распределения нагрузки
-3. **Database**: SQLite с WAL mode для лучшей конкурентности
-
-### Надежность
-
-1. **INSERT OR IGNORE**: предотвращает дубликаты доменов
-2. **ON CONFLICT DO UPDATE**: обновляет существующие IP
-3. **Счетчик резолвингов**: предотвращает бесконечные попытки
-4. **Таймауты**: ограничение времени DNS запросов
-
-### Производительность
-
-1. **Пул воркеров**: параллельная обработка доменов
-2. **Индексы БД**: быстрый поиск по ключевым полям
-3. **Batch processing**: обработка доменов пакетами
-4. **Асинхронная обработка**: UDP сообщения не блокируют друг друга
-
-## Масштабирование
-
-### Вертикальное
-
-- Увеличение количества воркеров (`workers`)
-- Уменьшение интервала резолвинга (`interval_seconds`)
-- Увеличение batch size в коде
-
-### Горизонтальное
-
-Для горизонтального масштабирования потребуется:
-- Централизованная БД (PostgreSQL/MySQL вместо SQLite)
-- Балансировщик для UDP трафика
-- Координация между экземплярами (distributed locks)
-
-## Мониторинг
-
-### Логи
-
-Программа логирует:
-- Прием UDP сообщений
-- Результаты DNS резолвинга
-- Ошибки обработки
-- Старт/стоп компонентов
-
-### Метрики (в БД)
-
-- Количество доменов
-- Количество IP адресов
-- Статистика запросов
-- Прогресс резолвинга
-
-Используйте `monitor.sh` для просмотра метрик.
-
-## Безопасность
-
-### Текущие меры
-
-- Валидация входящих данных
-- Ограничение размера UDP пакетов (4096 байт)
-- Таймауты для внешних запросов
-
-### Рекомендации
-
-- Файрвол для ограничения доступа к UDP порту
-- Rate limiting для предотвращения флуда
-- Мониторинг размера БД
-- Периодическая очистка старых записей статистики
+~~~text
+dns-collector/
+├── cmd/dns-collector/main.go       # запуск, graceful shutdown
+├── internal/
+│   ├── config/config.go            # YAML + env + валидация
+│   ├── database/
+│   │   ├── database.go             # SQL и upsert
+│   │   ├── migrations.go           # golang-migrate + embed
+│   │   └── migrations/*.sql
+│   ├── server/udp.go               # UDP-приёмник
+│   ├── resolver/resolver.go        # пул воркеров и DNS
+│   ├── cleanup/cleanup.go          # retention
+│   └── metrics/                    # Prometheus/InfluxDB/DB-метрики
+├── config/config.yaml
+├── Dockerfile
+└── ...                             # тесты, документация, скрипты
+~~~

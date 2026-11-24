@@ -1,0 +1,35 @@
+=== info ===
+dealloc|stats_reset
+0|2026-11-22 18:35:41.850501+00
+(1 row)
+=== count ===
+rows|calls|wal_bytes
+23|4618|35856502
+(1 row)
+=== top wal ===
+calls|wal_bytes|total_ms|query
+2578|29424146|608.4|INSERT INTO ip (domain_id, ip, type, time) VALUES ($1, $2, $3, $4) ON CONFLICT(domain_id, ip) DO UPDATE SET time = $5, t
+1000|4444504|131.5|UPDATE domain SET resolv_count = CASE WHEN resolv_count >= max_resolv - $3 THEN CAST(max_resolv * $4 / $5 AS INTEGER) EL
+253|1097827|58.3|UPDATE domain SET last_seen = $1 WHERE id = $2
+253|846853|38.2|INSERT INTO domain_stat (domain, client_ip, rtype, timestamp) VALUES ($1, $2, $3, $4)
+5|24134|173.2|SELECT COUNT(*) FROM ip
+5|17263|23.2|SELECT COUNT(*) FROM domain
+253|1547|126.3|INSERT INTO domain (domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen) VALUES ($1, $2, $6, $3, 
+253|228|6.5|SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen FROM domain WHERE domain = $1
+(8 rows)
+=== io with timings ===
+backend_type|writes|write_time|reads|read_time
+background writer|33465682|0.015||
+checkpointer|20738873|41.712||
+autovacuum worker|10955394|7.053|542278174|627.321
+client backend|2536783|0|36509736|290.587
+background worker|48764|0|489967|17.711000000000002
+autovacuum worker|42024|0|2391080|8.651
+client backend|31253|0|3184748|0
+startup|4717|0|29|0
+(8 rows)
+=== service health ===
+{"status":"ok","time":"2026-11-22T18:38:09.703972083Z"}
+dns-collector-webapi | Up 10 days (healthy)
+dns-collector | Up 10 days
+dns-collector-postgres | Up 2 minutes (healthy)
