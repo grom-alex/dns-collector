@@ -112,7 +112,7 @@ docker build -t dns-collector-webapi:test ./web-api
 - `.github/workflows/build.yml` — legacy: Go 1.21, `libsqlite3`, `continue-on-error: true`; либо удалить, либо привести к `test.yml`.
 - PR template добавлен; branch protection нужно включить в настройках GitHub (в репозитории это не задаётся).
 - Frontend не имеет тестов/линтера.
-- `release.yml` теперь публикует Docker-образы; для этого в GitHub должны быть заданы secrets `REGISTRY_USERNAME`/`REGISTRY_PASSWORD`.
+- `release.yml` собирает бинарники и GitHub Release; Docker-образы публикуются с внутренней машины, потому что `registry.gromas.ru` не резолвится с GitHub-hosted runner. Secrets `REGISTRY_USERNAME`/`REGISTRY_PASSWORD` понадобятся только для self-hosted runner.
 
 До исправления CI считаем обязательным `test.yml`, а `build.yml` — вспомогательным.
 
@@ -127,40 +127,32 @@ docker build -t dns-collector-webapi:test ./web-api
 Порядок релиза:
 
 1. Подготовьте **release PR** в `main`: обновите `CHANGELOG.md` (версия, дата, изменения, миграции), версии образов в `deploy/production/docker-compose.yml` и, при необходимости, в `docker-compose.yml`.
-2. После merge release PR создайте аннотированный тег на merge-коммите `main` и запушьте только тег:
+2. Соберите и опубликуйте Docker-образы **с внутренней машины**, где выполнен `docker login registry.gromas.ru`. GitHub-hosted runners не резолвят `registry.gromas.ru`, поэтому Docker-публикация в `release.yml` невозможна.
+   ~~~bash
+   docker buildx build --platform linux/amd64 --pull --push \
+     -t registry.gromas.ru/apps/dns-collector/dns-collector:X.Y.Z \
+     -t registry.gromas.ru/apps/dns-collector/dns-collector:latest ./dns-collector
+   docker buildx build --platform linux/amd64 --pull --push \
+     -t registry.gromas.ru/apps/dns-collector/web-api:X.Y.Z \
+     -t registry.gromas.ru/apps/dns-collector/web-api:latest ./web-api
+   ~~~
+   `latest` — только для стабильного релиза, не для предварительного.
+3. После push создайте аннотированный тег на merge-коммите `main` и запушьте только тег:
    ~~~bash
    git switch main
    git pull --ff-only origin main
    git tag -a vX.Y.Z -m "Release vX.Y.Z"
    git push origin vX.Y.Z
    ~~~
-3. Workflow [.github/workflows/release.yml](.github/workflows/release.yml) на тег `v*`:
-   - собирает и публикует Docker-образы `X.Y.Z` и `latest` (для стабильных тегов) в `registry.gromas.ru`;
-   - собирает бинарники;
-   - создаёт GitHub Release.
-4. Дождитесь зелёного `Release`. Проверьте образы:
+4. Workflow [.github/workflows/release.yml](.github/workflows/release.yml) на тег `v*` собирает бинарники и создаёт GitHub Release. Docker-образы уже опубликованы на шаге 2.
+5. Проверьте:
    ~~~bash
    docker pull registry.gromas.ru/apps/dns-collector/dns-collector:X.Y.Z
    docker pull registry.gromas.ru/apps/dns-collector/web-api:X.Y.Z
+   gh release view vX.Y.Z
    ~~~
-5. Убедитесь, что GitHub Release создан, а теги образов соответствуют версии.
 
-Если CI недоступен, допустима ручная публикация с машины, где выполнен `docker login registry.gromas.ru`:
-
-~~~bash
-docker build --no-cache \
-  -t registry.gromas.ru/apps/dns-collector/dns-collector:X.Y.Z \
-  -t registry.gromas.ru/apps/dns-collector/dns-collector:latest ./dns-collector
-docker build --no-cache \
-  -t registry.gromas.ru/apps/dns-collector/web-api:X.Y.Z \
-  -t registry.gromas.ru/apps/dns-collector/web-api:latest ./web-api
-docker push registry.gromas.ru/apps/dns-collector/dns-collector:X.Y.Z
-docker push registry.gromas.ru/apps/dns-collector/dns-collector:latest
-docker push registry.gromas.ru/apps/dns-collector/web-api:X.Y.Z
-docker push registry.gromas.ru/apps/dns-collector/web-api:latest
-~~~
-
-Секреты CI: `REGISTRY_USERNAME` и `REGISTRY_PASSWORD` (personal access token registry с правом push). Не публикуйте `latest` вручную для предварительных версий.
+Секреты `REGISTRY_USERNAME`/`REGISTRY_PASSWORD` нужны только для будущего self-hosted runner с доступом в внутреннюю сеть; с GitHub-hosted они не используются.
 
 ## 7. Деплой
 

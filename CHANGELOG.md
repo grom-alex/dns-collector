@@ -6,7 +6,7 @@ All notable changes to DNS Collector will be documented in this file.
 
 ### Changed
 
-- Release workflow now builds and pushes both Docker images to `registry.gromas.ru` on `v*` tags (`X.Y.Z` and `latest` for stable tags), then builds binaries and creates GitHub Release. Uses repository secrets `REGISTRY_USERNAME`/`REGISTRY_PASSWORD`; Go version in the release job updated to 1.24.
+- Release workflow builds binaries and creates GitHub Release on `v*` tags (Go 1.24). Docker images are published from the internal build host: `registry.gromas.ru` is not resolvable from GitHub-hosted runners, and an attempt to push from CI failed with `no such host`.
 
 ## [2.9.0] - 2026-11-24
 
