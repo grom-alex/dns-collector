@@ -4,6 +4,10 @@ All notable changes to DNS Collector will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Release workflow now builds and pushes both Docker images to `registry.gromas.ru` on `v*` tags (`X.Y.Z` and `latest` for stable tags), then builds binaries and creates GitHub Release. Uses repository secrets `REGISTRY_USERNAME`/`REGISTRY_PASSWORD`; Go version in the release job updated to 1.24.
+
 ## [2.9.0] - 2026-11-24
 
 ### Changed

@@ -110,9 +110,9 @@ docker build -t dns-collector-webapi:test ./web-api
 Текущие пробелы, которые надо закрыть отдельным PR (QUA-3 в плане):
 
 - `.github/workflows/build.yml` — legacy: Go 1.21, `libsqlite3`, `continue-on-error: true`; либо удалить, либо привести к `test.yml`.
-- `.github/workflows/release.yml` собирает только бинарники, но не публикует Docker-образы; публикация сейчас ручная.
 - PR template добавлен; branch protection нужно включить в настройках GitHub (в репозитории это не задаётся).
 - Frontend не имеет тестов/линтера.
+- `release.yml` теперь публикует Docker-образы; для этого в GitHub должны быть заданы secrets `REGISTRY_USERNAME`/`REGISTRY_PASSWORD`.
 
 До исправления CI считаем обязательным `test.yml`, а `build.yml` — вспомогательным.
 
@@ -127,30 +127,40 @@ docker build -t dns-collector-webapi:test ./web-api
 Порядок релиза:
 
 1. Подготовьте **release PR** в `main`: обновите `CHANGELOG.md` (версия, дата, изменения, миграции), версии образов в `deploy/production/docker-compose.yml` и, при необходимости, в `docker-compose.yml`.
-2. После merge release PR соберите и опубликуйте образы (пока вручную, до исправления release workflow):
-   ~~~bash
-   docker build --no-cache \
-     -t registry.gromas.ru/apps/dns-collector/dns-collector:X.Y.Z \
-     -t registry.gromas.ru/apps/dns-collector/dns-collector:latest ./dns-collector
-   docker build --no-cache \
-     -t registry.gromas.ru/apps/dns-collector/web-api:X.Y.Z \
-     -t registry.gromas.ru/apps/dns-collector/web-api:latest ./web-api
-   docker push registry.gromas.ru/apps/dns-collector/dns-collector:X.Y.Z
-   docker push registry.gromas.ru/apps/dns-collector/dns-collector:latest
-   docker push registry.gromas.ru/apps/dns-collector/web-api:X.Y.Z
-   docker push registry.gromas.ru/apps/dns-collector/web-api:latest
-   ~~~
-3. Проверьте образы локально (запуск, `--help`/health).
-4. Создайте аннотированный тег на merge-коммите `main` и запушьте только тег:
+2. После merge release PR создайте аннотированный тег на merge-коммите `main` и запушьте только тег:
    ~~~bash
    git switch main
    git pull --ff-only origin main
    git tag -a vX.Y.Z -m "Release vX.Y.Z"
    git push origin vX.Y.Z
    ~~~
-5. Убедитесь, что GitHub Release создан и образы имеют теги `X.Y.Z` и `latest`.
+3. Workflow [.github/workflows/release.yml](.github/workflows/release.yml) на тег `v*`:
+   - собирает и публикует Docker-образы `X.Y.Z` и `latest` (для стабильных тегов) в `registry.gromas.ru`;
+   - собирает бинарники;
+   - создаёт GitHub Release.
+4. Дождитесь зелёного `Release`. Проверьте образы:
+   ~~~bash
+   docker pull registry.gromas.ru/apps/dns-collector/dns-collector:X.Y.Z
+   docker pull registry.gromas.ru/apps/dns-collector/web-api:X.Y.Z
+   ~~~
+5. Убедитесь, что GitHub Release создан, а теги образов соответствуют версии.
 
-Не публикуйте `latest`, если не уверены в релизе; лучше сначала `X.Y.Z`, затем `latest` после smoke-теста.
+Если CI недоступен, допустима ручная публикация с машины, где выполнен `docker login registry.gromas.ru`:
+
+~~~bash
+docker build --no-cache \
+  -t registry.gromas.ru/apps/dns-collector/dns-collector:X.Y.Z \
+  -t registry.gromas.ru/apps/dns-collector/dns-collector:latest ./dns-collector
+docker build --no-cache \
+  -t registry.gromas.ru/apps/dns-collector/web-api:X.Y.Z \
+  -t registry.gromas.ru/apps/dns-collector/web-api:latest ./web-api
+docker push registry.gromas.ru/apps/dns-collector/dns-collector:X.Y.Z
+docker push registry.gromas.ru/apps/dns-collector/dns-collector:latest
+docker push registry.gromas.ru/apps/dns-collector/web-api:X.Y.Z
+docker push registry.gromas.ru/apps/dns-collector/web-api:latest
+~~~
+
+Секреты CI: `REGISTRY_USERNAME` и `REGISTRY_PASSWORD` (personal access token registry с правом push). Не публикуйте `latest` вручную для предварительных версий.
 
 ## 7. Деплой
 
@@ -231,5 +241,5 @@ docker compose exec -T postgres psql -U dns_collector -d dns_collector \
 - Регламент зафиксирован в этом файле.
 - `.claude/DEVELOPMENT_WORKFLOW.md` оставлен как указатель на этот документ.
 - PR template: [.github/pull_request_template.md](.github/pull_request_template.md).
-- CI-пробелы перечислены в разделе 5; исправление — отдельные PR (QUA-3).
+- CI-пробелы перечислены в разделе 5; Docker-публикация в `release.yml` добавлена, остаются `build.yml`, branch protection и frontend-проверки (QUA-3).
 - Деплой-документация: [DEPLOYMENT.md](DEPLOYMENT.md), [deploy/production/README.md](deploy/production/README.md); версии синхронизированы с 2.9.0.
