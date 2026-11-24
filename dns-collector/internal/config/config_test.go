@@ -163,10 +163,10 @@ logging:
 
 func TestLoad_InvalidResolverConfig(t *testing.T) {
 	tests := []struct {
-		name             string
-		intervalSeconds  string
-		maxResolv        string
-		expectError      bool
+		name            string
+		intervalSeconds string
+		maxResolv       string
+		expectError     bool
 	}{
 		{"negative interval", "-1", "5", true},
 		{"zero interval", "0", "5", true},
@@ -248,6 +248,15 @@ logging:
 	// Workers should default to 1 if set to 0 or negative
 	if cfg.Resolver.Workers != 1 {
 		t.Errorf("Expected Workers=1 (default), got %d", cfg.Resolver.Workers)
+	}
+	if cfg.Server.UDPWorkers != 16 {
+		t.Errorf("Expected UDPWorkers=16 (default), got %d", cfg.Server.UDPWorkers)
+	}
+	if cfg.Server.UDPQueueSize != 4096 {
+		t.Errorf("Expected UDPQueueSize=4096 (default), got %d", cfg.Server.UDPQueueSize)
+	}
+	if cfg.Resolver.IPRefreshHours != 24 {
+		t.Errorf("Expected IPRefreshHours=24 (default), got %d", cfg.Resolver.IPRefreshHours)
 	}
 }
 

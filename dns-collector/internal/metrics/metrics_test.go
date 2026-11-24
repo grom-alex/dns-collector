@@ -36,6 +36,9 @@ func TestNewRegistry(t *testing.T) {
 	if r.ServerMessagesReceived == nil {
 		t.Error("ServerMessagesReceived is nil")
 	}
+	if r.ServerMessagesDropped == nil {
+		t.Error("ServerMessagesDropped is nil")
+	}
 	if r.ServerDomainsReceived == nil {
 		t.Error("ServerDomainsReceived is nil")
 	}
@@ -76,6 +79,7 @@ func TestRegistryMetricsCanBeUsed(t *testing.T) {
 	r.ResolverLookups.WithLabelValues("ipv6", "error").Inc()
 
 	r.ServerMessagesReceived.WithLabelValues("valid").Inc()
+	r.ServerMessagesDropped.WithLabelValues("udp_queue_full").Inc()
 	r.ServerDomainsReceived.WithLabelValues("dns").Inc()
 	r.ServerNewDomains.Inc()
 
@@ -117,6 +121,7 @@ func TestRegistryMetricsCanBeUsed(t *testing.T) {
 		"dns_resolver_batch_size",
 		"dns_resolver_active_workers",
 		"dns_server_messages_received_total",
+		"dns_server_messages_dropped_total",
 		"dns_server_domains_received_total",
 		"dns_server_new_domains_total",
 		"dns_server_processing_duration_seconds",

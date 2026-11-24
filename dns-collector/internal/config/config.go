@@ -18,7 +18,9 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	UDPPort int `yaml:"udp_port"`
+	UDPPort      int `yaml:"udp_port"`
+	UDPWorkers   int `yaml:"udp_workers"`
+	UDPQueueSize int `yaml:"udp_queue_size"`
 }
 
 type DatabaseConfig struct {
@@ -37,6 +39,7 @@ type ResolverConfig struct {
 	Workers            int  `yaml:"workers"`
 	CyclicResolv       bool `yaml:"cyclic_resolv"`        // Enable cyclic resolution (reset after max_resolv)
 	ResolvCooldownMins int  `yaml:"resolv_cooldown_mins"` // Cooldown between cycles in minutes
+	IPRefreshHours     int  `yaml:"ip_refresh_hours"`     // How often unchanged IPs get their time refreshed
 }
 
 type LoggingConfig struct {
@@ -94,6 +97,12 @@ func Load(path string) (*Config, error) {
 	if cfg.Server.UDPPort <= 0 || cfg.Server.UDPPort > 65535 {
 		return nil, fmt.Errorf("invalid UDP port: %d", cfg.Server.UDPPort)
 	}
+	if cfg.Server.UDPWorkers <= 0 {
+		cfg.Server.UDPWorkers = 16
+	}
+	if cfg.Server.UDPQueueSize <= 0 {
+		cfg.Server.UDPQueueSize = 4096
+	}
 	if cfg.Resolver.IntervalSeconds <= 0 {
 		return nil, fmt.Errorf("invalid resolver interval: %d", cfg.Resolver.IntervalSeconds)
 	}
@@ -102,6 +111,12 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Resolver.Workers <= 0 {
 		cfg.Resolver.Workers = 1
+	}
+	if cfg.Resolver.IPRefreshHours <= 0 {
+		cfg.Resolver.IPRefreshHours = 24
+	}
+	if cfg.Resolver.IPRefreshHours > 720 {
+		return nil, fmt.Errorf("resolver ip_refresh_hours must not exceed 720, got %d", cfg.Resolver.IPRefreshHours)
 	}
 	if cfg.WebAPI.Port <= 0 || cfg.WebAPI.Port > 65535 {
 		cfg.WebAPI.Port = 8080 // default port

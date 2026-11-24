@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 )
 
 type Database struct {
@@ -256,6 +256,124 @@ func (db *Database) InsertOrUpdateIP(domainID int64, ip, ipType string) error {
 	}
 
 	return nil
+}
+
+// InsertDomainStatsBatch inserts a batch of statistics rows in one statement.
+func (db *Database) InsertDomainStatsBatch(stats []DomainStat) error {
+	if len(stats) == 0 {
+		return nil
+	}
+
+	domains := make([]string, len(stats))
+	clientIPs := make([]string, len(stats))
+	rtypes := make([]string, len(stats))
+	timestamps := make([]string, len(stats))
+	for i, s := range stats {
+		domains[i] = s.Domain
+		clientIPs[i] = s.ClientIP
+		rtypes[i] = s.RType
+		timestamps[i] = formatTimestamp(s.Timestamp)
+	}
+
+	_, err := db.DB.Exec(
+		`INSERT INTO domain_stat (domain, client_ip, rtype, timestamp)
+		 SELECT * FROM unnest($1::text[], $2::text[], $3::text[], $4::timestamp[])`,
+		pq.Array(domains), pq.Array(clientIPs), pq.Array(rtypes), pq.Array(timestamps),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to insert domain stats batch: %w", err)
+	}
+	return nil
+}
+
+// UpdateLastSeenBatch updates last_seen for many domains in one statement.
+// Rows updated less than minInterval ago are left untouched to avoid churn.
+func (db *Database) UpdateLastSeenBatch(updates map[int64]time.Time, minInterval time.Duration) (int64, error) {
+	if len(updates) == 0 {
+		return 0, nil
+	}
+	if minInterval < 0 {
+		minInterval = 0
+	}
+
+	ids := make([]int64, 0, len(updates))
+	timestamps := make([]string, 0, len(updates))
+	for id, ts := range updates {
+		ids = append(ids, id)
+		timestamps = append(timestamps, formatTimestamp(ts))
+	}
+
+	res, err := db.DB.Exec(
+		`UPDATE domain d
+		 SET last_seen = v.ts
+		 FROM (SELECT * FROM unnest($1::bigint[], $2::timestamp[]) AS v(id, ts)) v
+		 WHERE d.id = v.id
+		   AND (d.last_seen IS NULL OR d.last_seen < v.ts - make_interval(secs => $3))`,
+		pq.Array(ids), pq.Array(timestamps), int(minInterval.Seconds()),
+	)
+	if err != nil {
+		return 0, fmt.Errorf("failed to update last_seen batch: %w", err)
+	}
+
+	updated, err := res.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get last_seen rows affected: %w", err)
+	}
+	return updated, nil
+}
+
+// UpsertIPs inserts new addresses and refreshes timestamps for returned addresses.
+// Addresses that are no longer returned are deliberately left untouched: they age out
+// through the normal IP retention cleanup instead of causing delete/insert churn on
+// DNS round-robin answers.
+func (db *Database) UpsertIPs(domainID int64, ipType string, ips []string, refresh time.Duration) error {
+	if len(ips) == 0 {
+		return nil
+	}
+	if refresh <= 0 {
+		refresh = 24 * time.Hour
+	}
+
+	tx, err := db.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin IP upsert: %w", err)
+	}
+	defer func() {
+		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
+			log.Printf("Error rolling back IP upsert: %v", err)
+		}
+	}()
+
+	now := time.Now()
+	if _, err := tx.Exec(
+		`INSERT INTO ip (domain_id, ip, type, time)
+		 SELECT $1, unnest($2::text[]), $3, $4::timestamp
+		 ON CONFLICT (domain_id, ip) DO NOTHING`,
+		domainID, pq.Array(ips), ipType, now,
+	); err != nil {
+		return fmt.Errorf("failed to insert IPs: %w", err)
+	}
+
+	if _, err := tx.Exec(
+		`UPDATE ip
+		 SET time = $4::timestamp
+		 WHERE domain_id = $1
+		   AND type = $3
+		   AND ip = ANY($2::text[])
+		   AND time < $4::timestamp - make_interval(secs => $5)`,
+		domainID, pq.Array(ips), ipType, now, int(refresh.Seconds()),
+	); err != nil {
+		return fmt.Errorf("failed to refresh IPs: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit IP upsert: %w", err)
+	}
+	return nil
+}
+
+func formatTimestamp(t time.Time) string {
+	return t.Format("2006-01-02 15:04:05.999999")
 }
 
 // UpdateDomainResolvStats updates resolv_count and last_resolv_time

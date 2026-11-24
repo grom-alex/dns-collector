@@ -4,8 +4,24 @@ All notable changes to DNS Collector will be documented in this file.
 
 ## [Unreleased] - 2026-11-24
 
+### Changed
+
+- UDP server now uses a bounded worker pool (`server.udp_workers`, default 16) and a bounded queue (`server.udp_queue_size`, default 4096) instead of an unbounded goroutine per packet. Dropped packets are counted in `dns_server_messages_dropped_total`.
+- Added a buffered event writer:
+  - domain IDs are cached (`domain -> id`, TTL 24h);
+  - `domain_stat` rows are inserted in batches (500 rows / 1s);
+  - `last_seen` is updated in batches at most once per 5 minutes per domain;
+  - per-packet and per-IP logging removed.
+- Resolver now upserts IP sets instead of rewriting unchanged rows:
+  - new addresses are inserted;
+  - `ip.time` is refreshed at most once per `resolver.ip_refresh_hours` (default 24h);
+  - addresses no longer returned are not refreshed and age out via the normal IP retention cleanup (no delete/insert churn on round-robin answers).
+- Added `resolver.ip_refresh_hours`, `server.udp_workers`, `server.udp_queue_size` configuration options.
+
 ### Fixed
 
+- Per-packet `INSERT INTO domain ... ON CONFLICT DO NOTHING` + `SELECT` replaced by the domain cache (only cache misses touch the DB).
+- Unchanged IP addresses no longer generate an UPDATE on every resolution.
 - Docker images moved from Debian bullseye to bookworm (`golang:1.24-bookworm`, `debian:bookworm-slim`): the bullseye-security repository started returning 404 for openssl/ca-certificates, breaking CI Docker builds.
 
 ## [2.8.0] - 2026-01-02

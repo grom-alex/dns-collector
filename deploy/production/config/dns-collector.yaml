@@ -1,5 +1,7 @@
 server:
   udp_port: 5353
+  udp_workers: 16
+  udp_queue_size: 4096
 
 database:
   host: "postgres"
@@ -16,6 +18,7 @@ resolver:
   workers: 10  # More workers for production
   cyclic_resolv: true  # Enable cyclic resolution (reset after max_resolv)
   resolv_cooldown_mins: 240  # Cooldown between cycles (4 hours)
+  ip_refresh_hours: 24
 
 logging:
   level: "info"  # info level for production
