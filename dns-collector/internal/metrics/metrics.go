@@ -18,6 +18,7 @@ type Registry struct {
 
 	// UDP Server metrics
 	ServerMessagesReceived *prometheus.CounterVec
+	ServerMessagesDropped  *prometheus.CounterVec
 	ServerDomainsReceived  *prometheus.CounterVec
 	ServerNewDomains       prometheus.Counter
 	ServerProcessingTime   prometheus.Histogram
@@ -89,6 +90,13 @@ func NewRegistry() *Registry {
 				Help: "Total number of UDP messages received",
 			},
 			[]string{"status"},
+		),
+		ServerMessagesDropped: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "dns_server_messages_dropped_total",
+				Help: "Total number of UDP messages dropped due to internal backpressure",
+			},
+			[]string{"reason"},
 		),
 		ServerDomainsReceived: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
@@ -173,6 +181,7 @@ func NewRegistry() *Registry {
 		r.ResolverBatchSize,
 		r.ResolverActiveWorkers,
 		r.ServerMessagesReceived,
+		r.ServerMessagesDropped,
 		r.ServerDomainsReceived,
 		r.ServerNewDomains,
 		r.ServerProcessingTime,

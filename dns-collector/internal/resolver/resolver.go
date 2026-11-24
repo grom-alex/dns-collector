@@ -2,6 +2,7 @@ package resolver
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net"
 	"strings"
@@ -145,81 +146,71 @@ func (r *Resolver) worker(id int, domainCh <-chan database.Domain, wg *sync.Wait
 }
 
 func (r *Resolver) resolveDomain(domain database.Domain) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(r.cfg.Resolver.TimeoutSeconds)*time.Second)
-	defer cancel()
+	timeout := time.Duration(r.cfg.Resolver.TimeoutSeconds) * time.Second
 
-	hasResults := false
+	ctx4, cancel4 := context.WithTimeout(context.Background(), timeout)
+	ipv4Has, ipv4SyncErr := r.lookupAndSync(ctx4, "ip4", "ipv4", domain)
+	cancel4()
 
-	// Resolve IPv4 addresses
-	ipv4Start := time.Now()
-	ipv4Addrs, err := r.dnsConf.LookupIP(ctx, "ip4", domain.Domain)
-	ipv4Duration := time.Since(ipv4Start).Seconds()
+	ctx6, cancel6 := context.WithTimeout(context.Background(), timeout)
+	ipv6Has, ipv6SyncErr := r.lookupAndSync(ctx6, "ip6", "ipv6", domain)
+	cancel6()
 
-	if err != nil {
-		log.Printf("Error resolving IPv4 for %s: %v", domain.Domain, err)
-		r.recordMetric(func(m *metrics.Registry) {
-			m.ResolverLookups.WithLabelValues("ipv4", "error").Inc()
-			m.ResolverLookupDuration.WithLabelValues("ipv4").Observe(ipv4Duration)
-		})
-	} else {
-		r.recordMetric(func(m *metrics.Registry) {
-			m.ResolverLookups.WithLabelValues("ipv4", "success").Inc()
-			m.ResolverLookupDuration.WithLabelValues("ipv4").Observe(ipv4Duration)
-		})
-		for _, ip := range ipv4Addrs {
-			ipStr := ip.String()
-			if err := r.db.InsertOrUpdateIP(domain.ID, ipStr, "ipv4"); err != nil {
-				log.Printf("Error inserting IPv4 %s for domain %s: %v", ipStr, domain.Domain, err)
-			} else {
-				log.Printf("Resolved %s -> %s (IPv4)", domain.Domain, ipStr)
-				hasResults = true
-			}
-		}
-	}
-
-	// Resolve IPv6 addresses
-	ipv6Start := time.Now()
-	ipv6Addrs, err := r.dnsConf.LookupIP(ctx, "ip6", domain.Domain)
-	ipv6Duration := time.Since(ipv6Start).Seconds()
-
-	if err != nil {
-		log.Printf("Error resolving IPv6 for %s: %v", domain.Domain, err)
-		r.recordMetric(func(m *metrics.Registry) {
-			m.ResolverLookups.WithLabelValues("ipv6", "error").Inc()
-			m.ResolverLookupDuration.WithLabelValues("ipv6").Observe(ipv6Duration)
-		})
-	} else {
-		r.recordMetric(func(m *metrics.Registry) {
-			m.ResolverLookups.WithLabelValues("ipv6", "success").Inc()
-			m.ResolverLookupDuration.WithLabelValues("ipv6").Observe(ipv6Duration)
-		})
-		for _, ip := range ipv6Addrs {
-			ipStr := ip.String()
-			if err := r.db.InsertOrUpdateIP(domain.ID, ipStr, "ipv6"); err != nil {
-				log.Printf("Error inserting IPv6 %s for domain %s: %v", ipStr, domain.Domain, err)
-			} else {
-				log.Printf("Resolved %s -> %s (IPv6)", domain.Domain, ipStr)
-				hasResults = true
-			}
-		}
-	}
-
-	// Update domain statistics even if resolution failed
-	// This ensures we don't keep trying to resolve non-existent domains
+	// Update domain statistics even if resolution failed:
+	// this prevents retrying non-existent domains indefinitely.
 	cyclicMode := r.cfg.Resolver.CyclicResolv
 	if err := r.db.UpdateDomainResolvStats(domain.ID, cyclicMode); err != nil {
 		log.Printf("Error updating domain stats for %s: %v", domain.Domain, err)
 	}
 
-	// Record domain processed metric
 	status := "success"
-	if !hasResults {
+	switch {
+	case ipv4SyncErr != nil || ipv6SyncErr != nil:
+		status = "db_error"
+	case !ipv4Has && !ipv6Has:
 		status = "no_results"
-		log.Printf("No IP addresses resolved for %s", domain.Domain)
 	}
 	r.recordMetric(func(m *metrics.Registry) {
 		m.ResolverDomainsProcessed.WithLabelValues(status).Inc()
 	})
+}
+
+// lookupAndSync performs one DNS lookup and reconciles the stored IP set.
+// It returns whether addresses were found and a database sync error, if any.
+func (r *Resolver) lookupAndSync(ctx context.Context, network, ipType string, domain database.Domain) (bool, error) {
+	start := time.Now()
+	addrs, err := r.dnsConf.LookupIP(ctx, network, domain.Domain)
+	duration := time.Since(start).Seconds()
+
+	if err != nil {
+		r.recordMetric(func(m *metrics.Registry) {
+			m.ResolverLookups.WithLabelValues(ipType, "error").Inc()
+			m.ResolverLookupDuration.WithLabelValues(ipType).Observe(duration)
+		})
+		// "No such host" is the normal case for missing A/AAAA records; don't spam logs.
+		var dnsErr *net.DNSError
+		if !errors.As(err, &dnsErr) || !dnsErr.IsNotFound {
+			log.Printf("Error resolving %s for %s: %v", ipType, domain.Domain, err)
+		}
+		return false, nil
+	}
+
+	r.recordMetric(func(m *metrics.Registry) {
+		m.ResolverLookups.WithLabelValues(ipType, "success").Inc()
+		m.ResolverLookupDuration.WithLabelValues(ipType).Observe(duration)
+	})
+
+	ips := make([]string, 0, len(addrs))
+	for _, ip := range addrs {
+		ips = append(ips, ip.String())
+	}
+
+	refresh := time.Duration(r.cfg.Resolver.IPRefreshHours) * time.Hour
+	if err := r.db.UpsertIPs(domain.ID, ipType, ips, refresh); err != nil {
+		log.Printf("Error upserting %s for %s: %v", ipType, domain.Domain, err)
+		return len(ips) > 0, err
+	}
+	return len(ips) > 0, nil
 }
 
 // resolveCNAME can be used if you want to follow CNAME records

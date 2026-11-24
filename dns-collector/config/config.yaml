@@ -1,5 +1,7 @@
 server:
   udp_port: 5353
+  udp_workers: 16       # bounded worker pool for UDP handlers
+  udp_queue_size: 4096  # drop new packets if the queue is full
 
 database:
   host: "postgres"
@@ -16,6 +18,7 @@ resolver:
   workers: 5  # Number of concurrent resolver workers
   cyclic_resolv: true  # Enable cyclic resolution (reset after max_resolv)
   resolv_cooldown_mins: 240  # Cooldown between cycles (4 hours)
+  ip_refresh_hours: 24  # Refresh unchanged IP timestamps at most once per day
 
 logging:
   level: "info"  # debug, info, warn, error

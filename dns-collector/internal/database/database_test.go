@@ -581,4 +581,92 @@ func TestDeleteOldDomains_TransactionError(t *testing.T) {
 	}
 }
 
+func TestInsertDomainStatsBatch(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("Failed to create mock: %v", err)
+	}
+	defer func() { _ = db.Close() }()
 
+	database := &Database{DB: db}
+	mock.ExpectExec("INSERT INTO domain_stat").
+		WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 2))
+
+	stats := []DomainStat{
+		{Domain: "a.example", ClientIP: "192.0.2.1", RType: "dns", Timestamp: time.Now()},
+		{Domain: "b.example", ClientIP: "192.0.2.2", RType: "cache", Timestamp: time.Now()},
+	}
+	if err := database.InsertDomainStatsBatch(stats); err != nil {
+		t.Fatalf("InsertDomainStatsBatch failed: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("Unfulfilled expectations: %v", err)
+	}
+}
+
+func TestUpdateLastSeenBatch(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("Failed to create mock: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	database := &Database{DB: db}
+	mock.ExpectExec("UPDATE domain").
+		WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), 300).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	updated, err := database.UpdateLastSeenBatch(map[int64]time.Time{1: time.Now()}, 5*time.Minute)
+	if err != nil {
+		t.Fatalf("UpdateLastSeenBatch failed: %v", err)
+	}
+	if updated != 1 {
+		t.Fatalf("expected 1 updated row, got %d", updated)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("Unfulfilled expectations: %v", err)
+	}
+}
+
+func TestUpsertIPs(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("Failed to create mock: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	database := &Database{DB: db}
+	mock.ExpectBegin()
+	mock.ExpectExec("INSERT INTO ip").
+		WithArgs(int64(1), sqlmock.AnyArg(), "ipv4", sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("UPDATE ip").
+		WithArgs(int64(1), sqlmock.AnyArg(), "ipv4", sqlmock.AnyArg(), 86400).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	if err := database.UpsertIPs(1, "ipv4", []string{"192.0.2.1"}, 24*time.Hour); err != nil {
+		t.Fatalf("UpsertIPs failed: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("Unfulfilled expectations: %v", err)
+	}
+}
+
+func TestUpsertIPsEmptySetIsNoop(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("Failed to create mock: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	database := &Database{DB: db}
+	// No DB calls for an empty successful answer; stale rows age out via retention.
+	if err := database.UpsertIPs(1, "ipv6", nil, 24*time.Hour); err != nil {
+		t.Fatalf("UpsertIPs failed: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("Unfulfilled expectations: %v", err)
+	}
+}

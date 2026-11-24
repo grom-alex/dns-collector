@@ -9,10 +9,10 @@ import (
 
 // MockDatabase for testing server
 type MockDatabase struct {
-	InsertDomainStatFunc   func(domain, clientIP, rtype string) error
-	InsertOrGetDomainFunc  func(domain string, maxResolv int) (interface{}, error)
-	DeleteOldStatsFunc     func(retentionDays int) (int64, error)
-	CloseFunc              func() error
+	InsertDomainStatFunc  func(domain, clientIP, rtype string) error
+	InsertOrGetDomainFunc func(domain string, maxResolv int) (interface{}, error)
+	DeleteOldStatsFunc    func(retentionDays int) (int64, error)
+	CloseFunc             func() error
 }
 
 func (m *MockDatabase) InsertDomainStat(domain, clientIP, rtype string) error {
@@ -53,7 +53,6 @@ func TestNewUDPServer(t *testing.T) {
 
 	server := &UDPServer{
 		cfg:    cfg,
-		db:     nil, // Using nil since we just test structure
 		stopCh: make(chan struct{}),
 	}
 

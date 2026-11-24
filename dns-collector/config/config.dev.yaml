@@ -1,5 +1,7 @@
 server:
   udp_port: 5353
+  udp_workers: 8
+  udp_queue_size: 1024
 
 database:
   host: "localhost"
@@ -16,6 +18,7 @@ resolver:
   workers: 2           # Fewer workers for development
   cyclic_resolv: true  # Enable cyclic resolution
   resolv_cooldown_mins: 60  # Shorter cooldown for dev (1 hour)
+  ip_refresh_hours: 1   # Refresh IP timestamps more often in dev
 
 logging:
   level: "debug"       # Debug mode for development

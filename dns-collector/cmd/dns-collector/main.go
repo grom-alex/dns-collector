@@ -13,6 +13,7 @@ import (
 	"dns-collector/internal/metrics"
 	"dns-collector/internal/resolver"
 	"dns-collector/internal/server"
+	"dns-collector/internal/writer"
 )
 
 func main() {
@@ -93,8 +94,13 @@ func main() {
 		log.Printf("Metrics enabled on port %d", cfg.Metrics.Port)
 	}
 
+	// Buffered event writer: domain cache, stats batching, throttled last_seen.
+	eventWriter := writer.New(db, cfg.Resolver.MaxResolv, writer.DefaultConfig(), metricsRegistry)
+	eventWriter.Start()
+	defer eventWriter.Stop()
+
 	// Create and start UDP server
-	udpServer := server.NewUDPServer(cfg, db, metricsRegistry)
+	udpServer := server.NewUDPServer(cfg, eventWriter, metricsRegistry)
 	if err := udpServer.Start(); err != nil {
 		log.Fatalf("Failed to start UDP server: %v", err)
 	}

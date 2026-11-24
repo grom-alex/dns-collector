@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"sync"
 	"time"
 
 	"dns-collector/internal/config"
-	"dns-collector/internal/database"
 	"dns-collector/internal/metrics"
+	"dns-collector/internal/writer"
 )
 
 type DNSQuery struct {
@@ -20,17 +21,20 @@ type DNSQuery struct {
 }
 
 type UDPServer struct {
-	cfg     *config.Config
-	db      *database.Database
-	metrics *metrics.Registry
-	conn    *net.UDPConn
-	stopCh  chan struct{}
+	cfg        *config.Config
+	writer     *writer.Writer
+	metrics    *metrics.Registry
+	conn       *net.UDPConn
+	stopCh     chan struct{}
+	jobs       chan []byte
+	listenDone chan struct{}
+	wg         sync.WaitGroup
 }
 
-func NewUDPServer(cfg *config.Config, db *database.Database, m *metrics.Registry) *UDPServer {
+func NewUDPServer(cfg *config.Config, w *writer.Writer, m *metrics.Registry) *UDPServer {
 	return &UDPServer{
 		cfg:     cfg,
-		db:      db,
+		writer:  w,
 		metrics: m,
 		stopCh:  make(chan struct{}),
 	}
@@ -48,14 +52,23 @@ func (s *UDPServer) Start() error {
 	}
 
 	s.conn = conn
-	log.Printf("UDP server listening on port %d", s.cfg.Server.UDPPort)
+	s.jobs = make(chan []byte, s.cfg.Server.UDPQueueSize)
+	s.listenDone = make(chan struct{})
 
+	for i := 0; i < s.cfg.Server.UDPWorkers; i++ {
+		s.wg.Add(1)
+		go s.worker()
+	}
 	go s.listen()
 
+	log.Printf("UDP server listening on port %d (%d workers, queue %d)",
+		s.cfg.Server.UDPPort, s.cfg.Server.UDPWorkers, s.cfg.Server.UDPQueueSize)
 	return nil
 }
 
 func (s *UDPServer) listen() {
+	defer close(s.listenDone)
+
 	buffer := make([]byte, 4096)
 
 	for {
@@ -63,20 +76,38 @@ func (s *UDPServer) listen() {
 		case <-s.stopCh:
 			return
 		default:
-			n, _, err := s.conn.ReadFromUDP(buffer)
-			if err != nil {
-				log.Printf("Error reading from UDP: %v", err)
-				continue
-			}
-
-			// Create a copy of the data to avoid buffer reuse issues
-			// This prevents "data changing underfoot" when processing in goroutine
-			data := make([]byte, n)
-			copy(data, buffer[:n])
-
-			// Process message in a separate goroutine
-			go s.handleMessage(data)
 		}
+
+		n, _, err := s.conn.ReadFromUDP(buffer)
+		if err != nil {
+			select {
+			case <-s.stopCh:
+				return
+			default:
+			}
+			log.Printf("Error reading from UDP: %v", err)
+			continue
+		}
+
+		// The read buffer is reused; hand a private copy to a worker.
+		data := make([]byte, n)
+		copy(data, buffer[:n])
+
+		select {
+		case s.jobs <- data:
+		default:
+			// Queue is full: shed load instead of spawning unbounded goroutines.
+			s.recordMetric(func(m *metrics.Registry) {
+				m.ServerMessagesDropped.WithLabelValues("udp_queue_full").Inc()
+			})
+		}
+	}
+}
+
+func (s *UDPServer) worker() {
+	defer s.wg.Done()
+	for data := range s.jobs {
+		s.handleMessage(data)
 	}
 }
 
@@ -120,33 +151,19 @@ func (s *UDPServer) handleMessage(data []byte) {
 		query.RType = "unknown"
 	}
 
-	log.Printf("Received DNS query: domain=%s, client=%s, rtype=%s", query.Domain, query.ClientIP, query.RType)
-
-	// Insert statistics
-	if err := s.db.InsertDomainStat(query.Domain, query.ClientIP, query.RType); err != nil {
-		log.Printf("Error inserting domain stat: %v", err)
-	}
-
-	// Insert or get domain
-	domain, isNew, err := s.db.InsertOrGetDomain(query.Domain, s.cfg.Resolver.MaxResolv)
-	if err != nil {
-		log.Printf("Error inserting domain: %v", err)
+	if s.writer == nil {
+		log.Printf("UDP writer is not initialized; dropping query for %s", query.Domain)
+		s.recordMetric(func(m *metrics.Registry) {
+			m.ServerMessagesDropped.WithLabelValues("writer_unavailable").Inc()
+		})
 		return
 	}
+	s.writer.Submit(query.Domain, query.ClientIP, query.RType)
 
-	// Update last_seen timestamp to track when domain was last queried
-	if err := s.db.UpdateDomainLastSeen(domain.ID); err != nil {
-		log.Printf("Error updating domain last_seen: %v", err)
-	}
-
-	// Record metrics
 	s.recordMetric(func(m *metrics.Registry) {
 		m.ServerMessagesReceived.WithLabelValues("valid").Inc()
 		m.ServerDomainsReceived.WithLabelValues(query.RType).Inc()
 		m.ServerProcessingTime.Observe(time.Since(start).Seconds())
-		if isNew {
-			m.ServerNewDomains.Inc()
-		}
 	})
 }
 
@@ -181,6 +198,13 @@ func (s *UDPServer) Stop() {
 	close(s.stopCh)
 	if s.conn != nil {
 		_ = s.conn.Close()
+	}
+	if s.listenDone != nil {
+		<-s.listenDone
+	}
+	if s.jobs != nil {
+		close(s.jobs)
+		s.wg.Wait()
 	}
 	log.Println("UDP server stopped")
 }
