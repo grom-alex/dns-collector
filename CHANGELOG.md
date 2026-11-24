@@ -29,6 +29,7 @@ All notable changes to DNS Collector will be documented in this file.
 - Per-packet `INSERT INTO domain ... ON CONFLICT DO NOTHING` + `SELECT` replaced by the domain cache (only cache misses touch the DB).
 - Unchanged IP addresses no longer generate an UPDATE on every resolution.
 - Docker images moved from Debian bullseye to bookworm (`golang:1.24-bookworm`, `debian:bookworm-slim`): the bullseye-security repository started returning 404 for openssl/ca-certificates, breaking CI Docker builds.
+- Dockerfiles now build Go binaries on `$BUILDPLATFORM` with `GOOS=$TARGETOS GOARCH=$TARGETARCH`, so an arm64 workstation can build the linux/amd64 production images without running the Go compiler under QEMU (which crashed for web-api).
 
 ### Documentation
 

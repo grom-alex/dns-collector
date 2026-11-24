@@ -1,5 +1,5 @@
 # Build stage for frontend
-FROM node:20-alpine AS frontend-builder
+FROM --platform=$BUILDPLATFORM node:20-alpine AS frontend-builder
 
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
@@ -8,7 +8,10 @@ COPY frontend/ ./
 RUN npm run build
 
 # Build stage for backend
-FROM golang:1.24-bookworm AS backend-builder
+FROM --platform=$BUILDPLATFORM golang:1.24-bookworm AS backend-builder
+
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
@@ -18,7 +21,7 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o web-api ./cmd/main.go
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -ldflags="-s -w" -o web-api ./cmd/main.go
 
 # Final stage
 FROM debian:bookworm-slim
