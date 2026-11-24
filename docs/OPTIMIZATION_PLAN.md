@@ -205,6 +205,8 @@ HOT-update возможен, только если **ни один индекс�
 
 ### Этап 1. Горячий путь приложения (3 дня)
 
+**Статус:** реализовано в PR #17 (кэш доменов, батчинг `domain_stat`, троттлинг `last_seen`, upsert IP без перезаписи неизменных адресов, bounded worker pool).
+
 Цель — убрать 80–90% лишних записей без изменения схемы.
 
 - [ ] **Кэш `domain.id`.** LRU-кэш `domain -> id` на 100 тыс. записей с TTL 24 ч. При попадании — не делать `INSERT ... ON CONFLICT` и `SELECT`.
@@ -738,6 +740,7 @@ docker stats --no-stream dns-collector-postgres
 В рамках этой задачи:
 
 - создан этот план;
+- этап 1 (кэш доменов, батчинг `domain_stat`, троттлинг `last_seen`, upsert IP без перезаписи неизменных адресов) реализован в PR #17;
 - снят и зафиксирован baseline боевого стенда 2026-11-23: [DB_BASELINE.md](DB_BASELINE.md) + сырые данные в [baseline/2026-11-23](baseline/2026-11-23/);
 - включены `pg_stat_statements` и `track_io_timing`, снят первый query-level срез: [DB_STATISTICS.md](DB_STATISTICS.md);
 - переписаны `ARCHITECTURE.md`, `QUICKSTART.md`, `INSTALL.md`, `DOCKER.md`, `SUMMARY.md`, `SERVICES.md`, `TESTING.md`;

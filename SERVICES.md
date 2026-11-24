@@ -64,6 +64,8 @@
 ~~~yaml
 server:
   udp_port: 5353
+  udp_workers: 16
+  udp_queue_size: 4096
 
 database:
   host: "postgres"
@@ -80,6 +82,7 @@ resolver:
   workers: 5
   cyclic_resolv: true
   resolv_cooldown_mins: 240
+  ip_refresh_hours: 24
 
 retention:
   stats_days: 30

@@ -96,6 +96,8 @@ make build
 ~~~yaml
 server:
   udp_port: 5353
+  udp_workers: 16
+  udp_queue_size: 4096
 
 database:
   host: "postgres"      # для нативной сборки — localhost
@@ -111,6 +113,7 @@ resolver:
   timeout_seconds: 5
   workers: 5
   cyclic_resolv: true
+  ip_refresh_hours: 24
 
 retention:
   stats_days: 30

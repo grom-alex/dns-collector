@@ -18,7 +18,8 @@ dns-collector/                          # repository root
 │   │   │   ├── database.go             # SQL: upsert, selects, retention
 │   │   │   ├── migrations.go           # golang-migrate + embed
 │   │   │   └── migrations/*.sql        # 000001..000004
-│   │   ├── server/udp.go               # UDP JSON receiver
+│   │   ├── server/udp.go               # bounded UDP worker pool
+│   │   ├── writer/                     # domain cache, stats batching, last_seen
 │   │   ├── resolver/resolver.go        # worker pool + DNS lookups
 │   │   ├── cleanup/cleanup.go          # retention service
 │   │   └── metrics/                    # Prometheus, InfluxDB, DB counts

@@ -44,7 +44,8 @@
 | Компонент | Файл | Ответственность |
 |---|---|---|
 | Точка входа | `cmd/dns-collector/main.go` | конфиг, БД, миграции, запуск/остановка сервисов |
-| UDP-сервер | `internal/server/udp.go` | приём JSON, валидация, запись статистики и домена |
+| UDP-сервер | `internal/server/udp.go` | приём JSON, валидация, ограниченный пул воркеров |
+| Event writer | `internal/writer/writer.go` | кэш доменов, батчинг `domain_stat`, троттлинг `last_seen` |
 | Резолвер | `internal/resolver/resolver.go` | выборка доменов, DNS-lookup, upsert IP |
 | Слой БД | `internal/database/database.go` | SQL, upsert, выборки, очистка |
 | Миграции | `internal/database/migrations.go` + `migrations/*.sql` | схема и версии |
@@ -74,21 +75,24 @@
 
 1. `ReadFromUDP` читает датаграмму в буфер 4096 байт.
 2. Данные копируются в новый срез (буфер переиспользуется).
-3. На каждый пакет запускается горутина `handleMessage`.
+3. Пакет кладётся в ограниченную очередь `server.udp_queue_size`; её разбирает пул из `server.udp_workers` воркеров. При переполнении пакет отбрасывается и учитывается в `dns_server_messages_dropped_total{reason="udp_queue_full"}`.
 4. `trimInvalidJSONSuffix` отрезает мусор после последней `}` (костыль под реальные пакеты Unbound).
-5. `json.Unmarshal`; при ошибке — лог и метрика `invalid`.
-6. `InsertDomainStat` — запись в `domain_stat`.
-7. `InsertOrGetDomain` — `INSERT ... ON CONFLICT DO NOTHING RETURNING`; если строка уже есть, отдельный `SELECT`.
-8. `UpdateDomainLastSeen` — `UPDATE domain SET last_seen = now()`.
-9. Метрики: `valid`/`invalid`, `rtype`, время обработки, новые домены.
+5. `json.Unmarshal` и валидация; при ошибке — лог и метрика `invalid`.
+6. `writer.Submit`:
+   - domain ID ищется в LRU-кэше (`domain -> id`, TTL 24h);
+   - при промахе — один `InsertOrGetDomain` (и запись в кэш);
+   - строка статистики ставится в очередь и пишется батчем 500 строк / 1s;
+   - `last_seen` агрегируется в памяти и сбрасывается батчем раз в 60s (не чаще 5 минут на домен).
+7. Метрики: `valid`/`invalid`, `rtype`, время обработки, новые домены, dropped.
 
-Ключевая особенность: **на каждый пакет выполняется 3–4 SQL-запроса**, а горутины не ограничены пулом. Это главный источник нагрузки на PostgreSQL и диск; подробный разбор — в [плане](../docs/OPTIMIZATION_PLAN.md#21-карта-горячего-пути).
+Ключевая особенность: **на каждый пакет больше нет 3–4 SQL-запросов**. В штатном режиме (cache hit) пакет не делает SQL вообще: он попадает в очередь статистики и в in-memory `last_seen`. SQL выполняется только на промахе кэша и при плановом flush. Подробный разбор — в [плане](../docs/OPTIMIZATION_PLAN.md#21-карта-горячего-пути).
 
 ### 3.3. Обработка ошибок
 
 - `defer recover()` в `handleMessage` защищает процесс от паники при неожиданном JSON.
 - Ошибки БД логируются и не прерывают приём.
-- При ошибке `InsertOrGetDomain` запись статистики уже выполнена, а домен не обновлён — это допустимо, но приводит к рассинхронизации при сбоях БД.
+- При переполнении очереди пакет отбрасывается; это сознательный backpressure вместо неограниченного роста памяти.
+- Батч статистики при ошибке БД логируется и теряется; `last_seen` при ошибке возвращается в карту и повторяется на следующем flush.
 
 ## 4. Резолвер
 
@@ -119,20 +123,16 @@ LIMIT $2;
 
 Для каждого домена:
 
-1. Один контекст с таймаутом `timeout_seconds` используется **и для IPv4, и для IPv6**.
-2. `LookupIP(ctx, "ip4", domain)` и `LookupIP(ctx, "ip6", domain)`.
-3. Для каждого адреса — `InsertOrUpdateIP`:
-   ~~~sql
-   INSERT INTO ip (domain_id, ip, type, time)
-   VALUES ($1,$2,$3,$4)
-   ON CONFLICT (domain_id, ip) DO UPDATE
-   SET time = $5, type = $6;
-   ~~~
-   Даже если IP не изменился, строка переписывается, а `time` и `type` индексированы — HOT невозможен.
+1. IPv4 и IPv6 получают **отдельные контексты** с таймаутом `timeout_seconds`.
+2. `LookupIP(ctx4, "ip4", domain)` и `LookupIP(ctx6, "ip6", domain)`.
+3. Результат каждого успешного lookup передаётся в `UpsertIPs`:
+   - новые адреса вставляются (`ON CONFLICT DO NOTHING`);
+   - для вернувшихся адресов `time` обновляется не чаще `ip_refresh_hours` (по умолчанию 24h);
+   - адреса, которые больше не возвращаются, не обновляются и удаляются штатным retention по TTL, а не немедленным DELETE (защита от round-robin/CDN churn).
 4. `UpdateDomainResolvStats` — инкремент `resolv_count` и `last_resolv_time` (в циклическом режиме — сброс на 2/3).
-5. Логи на каждый домен и каждый IP.
+5. Логи — только ошибки; логи на каждый домен/IP удалены.
 
-Если IPv4-запрос израсходовал почти весь таймаут, IPv6-запрос почти гарантированно не успевает. Резолвинг идёт через системный резолвер (`/etc/resolv.conf`); отдельной настройки upstream DNS нет.
+Резолвинг идёт через системный резолвер (`/etc/resolv.conf`); отдельной настройки upstream DNS нет.
 
 ## 5. Retention и очистка
 
@@ -203,20 +203,22 @@ CREATE TABLE domain_stat (
 
 | Операция | Когда | Объём |
 |---|---|---|
-| `INSERT domain_stat` | каждый UDP-пакет | 1 строка |
-| `INSERT/SELECT domain` | каждый пакет для нового домена; для известного — `INSERT ... DO NOTHING` + `SELECT` | 1–2 запроса |
-| `UPDATE domain.last_seen` | каждый пакет | 1 строка + индекс |
-| `INSERT ip ... DO UPDATE` | каждый IP при каждом резолве | до нескольких строк на домен |
+| `INSERT/SELECT domain` | только при промахе кэша `domain -> id` | 1–2 запроса на новый/редкий домен |
+| `INSERT domain_stat` | батчем из очереди | 500 строк / 1s |
+| `UPDATE domain.last_seen` | батчем раз в 60s | не чаще 5 минут на домен |
+| `INSERT ... ON CONFLICT DO NOTHING` + условный `UPDATE ip.time` | пул адресов при резолве | новые + refresh раз в `ip_refresh_hours` |
 | `UPDATE domain.resolv_count/last_resolv_time` | каждый домен при каждом резолве | 1 строка + индексы |
 | `DELETE domain_stat` | раз в сутки | до сотен тысяч строк |
 | `DELETE ip/domain` | раз в сутки | меньше |
 
-Основные причины избыточной записи:
+Основные оставшиеся причины избыточной записи:
 
-1. `ip.time` обновляется при каждом резолве, даже если IP тот же.
-2. `domain.last_seen` обновляется на каждый пакет.
-3. Индексы на `resolv_count`, `last_resolv_time`, `last_seen`, `ip.time`, `ip.type` запрещают HOT.
-4. `domain_stat` — не партиционированная churn-таблица с шестью индексами.
+1. `domain.resolv_count` и `last_resolv_time` обновляются на каждый резолв, а индексы по ним запрещают HOT.
+2. `domain_stat` — не партиционированная churn-таблица с шестью индексами: INSERT на каждый пакет и массовый DELETE по retention.
+3. `ip.time` всё ещё обновляется раз в сутки на каждый вернувшийся IP; индексы по `time`/`type` препятствуют HOT.
+4. `domain_stat` и `ip` остаются раздутыми; индексы занимают ~93% БД.
+
+Что уже сделано в этапе 1: кэш доменов, батчинг статистики, троттлинг `last_seen`, upsert IP без перезаписи неизменных адресов и ограниченный пул воркеров. Следующие шаги — индексы, `fillfactor`, партиционирование и тюнинг PostgreSQL.
 
 Цифры, замеры и пошаговый план — в [docs/OPTIMIZATION_PLAN.md](../docs/OPTIMIZATION_PLAN.md).
 
@@ -226,7 +228,7 @@ CREATE TABLE domain_stat (
 
 - HTTP-сервер на `:9090`: `/metrics`, `/health`.
 - Prometheus-метрики:
-  - `dns_server_messages_received_total{status}`, `dns_server_domains_received_total{rtype}`, `dns_server_new_domains_total`, `dns_server_processing_duration_seconds`;
+  - `dns_server_messages_received_total{status}`, `dns_server_messages_dropped_total{reason}`, `dns_server_domains_received_total{rtype}`, `dns_server_new_domains_total`, `dns_server_processing_duration_seconds`;
   - `dns_resolver_lookups_total{ip_version,status}`, `dns_resolver_lookup_duration_seconds{ip_version}`, `dns_resolver_domains_processed_total{status}`, `dns_resolver_batch_size`, `dns_resolver_active_workers`;
   - `dns_cleanup_*` — удалённые строки, длительность, количество запусков;
   - `dns_db_domains_total`, `dns_db_ips_total` — обновляются раз в 30 с.
@@ -237,9 +239,9 @@ CREATE TABLE domain_stat (
 
 | Секция | Ключи |
 |---|---|
-| `server` | `udp_port` |
+| `server` | `udp_port`, `udp_workers`, `udp_queue_size` |
 | `database` | `host`, `port`, `user`, `password`, `database`, `ssl_mode` |
-| `resolver` | `interval_seconds`, `max_resolv`, `timeout_seconds`, `workers`, `cyclic_resolv`, `resolv_cooldown_mins` |
+| `resolver` | `interval_seconds`, `max_resolv`, `timeout_seconds`, `workers`, `cyclic_resolv`, `resolv_cooldown_mins`, `ip_refresh_hours` |
 | `logging` | `level` (в collector фактически не применяется) |
 | `retention` | `stats_days`, `cleanup_interval_hours`, `ip_ttl_days`, `domain_ttl_days` |
 | `metrics` | `enabled`, `port`, `path`, `influxdb` |
@@ -250,7 +252,7 @@ CREATE TABLE domain_stat (
 
 ## 10. Развёртывание
 
-- Docker multi-stage: сборка на `golang:1.24-bullseye`, runtime — `debian:bullseye-slim`, non-root пользователь `dnscollector`.
+- Docker multi-stage: сборка на `golang:1.24-bookworm`, runtime — `debian:bookworm-slim`, non-root пользователь `dnscollector`.
 - Конфиг монтируется в `/app/config/config.yaml` (только чтение).
 - Миграции применяются при старте; при ошибке миграции процесс завершается.
 - В корневом `docker-compose.yml` опубликован только `5353/udp`; PostgreSQL — `5432`; web-api — `8080`. Порт метрик 9090 в корневом compose не публикуется (в production — публикуется).
@@ -259,9 +261,10 @@ CREATE TABLE domain_stat (
 ## 11. Известные ограничения
 
 - Нет аутентификации на UDP-приёмнике: любой, кто видит порт, может прислать произвольные `domain`/`client_ip`.
-- Нет ограничения горутин и rate limit на UDP.
-- Батчи резолвера могут накладываться; один контекст на IPv4+IPv6.
-- `UPDATE` на каждый пакет/резолв и индексы на обновляемых столбцах → высокий износ диска.
+- UDP-воркеры и очередь ограничены, но при переполнении пакеты дропаются (метрика `dns_server_messages_dropped_total`).
+- Батчи резолвера могут накладываться; контексты IPv4/IPv6 раздельные.
+- Остаются `UPDATE domain` на каждый резолв и массовые `DELETE domain_stat`; индексы на обновляемых столбцах всё ещё препятствуют HOT.
+- Батч статистики при ошибке БД логируется и теряется (счётчика потерь пока нет).
 - `domain_stat` не партиционирована, retention через массовый `DELETE`.
 - `initSchema` и миграции дублируют друг друга; схема зависит от порядка запуска сервисов.
 - `ALTER DATABASE dns_collector` в миграции 000003.

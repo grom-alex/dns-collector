@@ -79,6 +79,8 @@ go build -o dns-collector ./cmd/dns-collector
 ```yaml
 server:
   udp_port: 5353
+  udp_workers: 16
+  udp_queue_size: 4096
 
 database:
   host: "postgres"       # Хост PostgreSQL
@@ -95,6 +97,7 @@ resolver:
   workers: 5            # Количество параллельных воркеров
   cyclic_resolv: true    # Циклический режим резолвинга (рекомендуется)
   resolv_cooldown_mins: 240  # Cooldown между циклами (4 часа)
+  ip_refresh_hours: 24   # Обновлять time неизменных IP не чаще раза в сутки
 
 logging:
   level: "info"  # Уровень логирования (debug, info, warn, error)
