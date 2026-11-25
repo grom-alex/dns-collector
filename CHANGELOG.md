@@ -4,13 +4,22 @@ All notable changes to DNS Collector will be documented in this file.
 
 ## [Unreleased]
 
+## [2.9.1] - 2026-11-25
+
+### Changed
+
+- Stage 2 index cleanup: removed unused/duplicate indexes on `domain`, `ip` and `domain_stat`, set `fillfactor=70` for `domain`/`ip`, added migration `000005_index_cleanup` and removed index recreation from `initSchema`. Production indexes were dropped with `DROP INDEX CONCURRENTLY` first.
+- Release workflow builds binaries and creates GitHub Release on `v*` tags (Go 1.24). Docker images are published from the internal build host.
+
 ### Fixed
 
 - Production config/compose now expose collector metrics on `8081`, matching the running stand; documented that the default config uses `9090`.
 
-### Changed
+### Docker Images
 
-- Release workflow builds binaries and creates GitHub Release on `v*` tags (Go 1.24). Docker images are published from the internal build host: `registry.gromas.ru` is not resolvable from GitHub-hosted runners, and an attempt to push from CI failed with `no such host`.
+- `registry.gromas.ru/apps/dns-collector/dns-collector:2.9.1`
+- `registry.gromas.ru/apps/dns-collector/web-api:2.9.1`
+
 
 ## [2.9.0] - 2026-11-24
 

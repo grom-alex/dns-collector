@@ -102,9 +102,7 @@ func (db *Database) initSchema() error {
 		max_resolv INTEGER NOT NULL,
 		last_resolv_time TIMESTAMP NOT NULL,
 		last_seen TIMESTAMP
-	);
-	CREATE INDEX IF NOT EXISTS idx_domain_resolv ON domain(resolv_count, max_resolv);
-	CREATE INDEX IF NOT EXISTS idx_domain_last_seen ON domain(last_seen);
+	) WITH (fillfactor = 70);
 	`
 
 	if _, err := db.DB.Exec(domainSchema); err != nil {
@@ -121,9 +119,7 @@ func (db *Database) initSchema() error {
 		time TIMESTAMP NOT NULL,
 		UNIQUE(domain_id, ip),
 		FOREIGN KEY(domain_id) REFERENCES domain(id) ON DELETE CASCADE
-	);
-	CREATE INDEX IF NOT EXISTS idx_ip_domain ON ip(domain_id);
-	CREATE INDEX IF NOT EXISTS idx_ip_time_cleanup ON ip(time);
+	) WITH (fillfactor = 70);
 	`
 
 	if _, err := db.DB.Exec(ipSchema); err != nil {
@@ -140,8 +136,6 @@ func (db *Database) initSchema() error {
 		timestamp TIMESTAMP NOT NULL
 	);
 	CREATE INDEX IF NOT EXISTS idx_domain_stat_timestamp ON domain_stat(timestamp);
-	CREATE INDEX IF NOT EXISTS idx_domain_stat_domain ON domain_stat(domain);
-	CREATE INDEX IF NOT EXISTS idx_domain_stat_client_ip ON domain_stat(client_ip);
 	`
 
 	if _, err := db.DB.Exec(statSchema); err != nil {
