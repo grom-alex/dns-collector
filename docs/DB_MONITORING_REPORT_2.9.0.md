@@ -1,0 +1,197 @@
+# 24-часовой профиль PostgreSQL после 2.9.0
+
+**Окно:** 2026-11-24 06:39:48Z — 2026-11-25 06:38:32Z (23,98 ч)
+**Релиз:** dns-collector 2.9.0 / web-api 2.9.0
+**Срезов:** 286, ошибок сбора: 0
+**Статистика сброшена:** 2026-11-24 06:39:44Z
+
+Профиль снят тем же [pg_monitor_24h.sh](../scripts/pg_monitor_24h.sh), что и baseline 2026-11-23, поэтому дельты сопоставимы.
+
+## 1. Итог
+
+Этап 1 сработал: WAL и физическая запись на диск упали примерно в 2,5–3 раза, IP-апдейты — более чем в 15 раз, вызовы `domain_stat` — в 7,5 раза.
+
+| Метрика | Baseline (2.8.0) | 2.9.0 | Δ |
+|---|---:|---:|---:|
+| WAL | 20,83 GB/сутки | **7,52 GB/сутки** | **−63,9%** |
+| Запись `sdb1` | 89,08 GB/сутки | **36,60 GB/сутки** | **−58,9%** |
+| Буферы PostgreSQL | 50,2 GB/сутки | **21,18 GB/сутки** | **−57,8%** |
+| `domain` UPDATE | 1,13 млн/сутки | **831 тыс./сутки** | **−26,5%** |
+| `ip` UPDATE строк | 1,72 млн/сутки | **108 тыс./сутки** | **−93,7%** |
+| `domain_stat` INSERT, вызовов | 412,6 тыс. | **54,7 тыс.** | **−86,7%** |
+| `domain_stat` INSERT, строк | 412,6 тыс. | **454,2 тыс.** | +10,1% (трафик +10%) |
+| `INSERT INTO domain`, вызовов | 412,6 тыс. | **5 466** | **−98,7%** |
+| `domain` autovacuum | 3 385 | **3 750** | +10,8% |
+| `domain_stat` dead tuples | 439 884 | **499 380** | +13,5% |
+| Размер БД | 7 755 MB | **7 759 MB** | +4 MB |
+| Размер индексов | 7 237 MB | **7 237 MB** | 0% |
+| `checkpoint_write_time` | 90,1% | **90,0%** | −0,1 п.п. |
+
+Главный вывод: **объём записи снизился, но структура проблемы осталась**. WAL теперь 7,5 GB/сутки, однако 90% календарного времени checkpointer всё ещё пишет, а 93% БД — индексы. Следующий этап — индексы, `fillfactor`, партиционирование `domain_stat` и ZFS 8K.
+
+## 2. Трафик и данные
+
+| Показатель | Значение |
+|---|---:|
+| Валидных UDP-пакетов | 454 200/сутки (5,26/с) |
+| Строк `domain_stat` | 454 210 |
+| Новых доменов | 525/сутки |
+| Доменов в БД | 16 457 |
+| IP в БД | 444 024 (+14 022/сутки) |
+| Успешных резолвов | 651 583 |
+| Резолвов без результатов | 67 393 |
+| IPv4 success / error | 649 356 / 69 644 |
+| IPv6 success / error | 219 184 / **499 816** |
+
+IPv6-ошибки — **69,5% IPv6-lookup’ов** и 34,8% всех lookup’ов. Это не изменилось относительно baseline; основная причина — отсутствие AAAA у значительной части доменов.
+
+Дропов UDP нет: метрика `dns_server_messages_dropped_total` не появлялась, очередь не переполнялась.
+
+## 3. Куда ушёл WAL
+
+`pg_stat_statements` учёл 6,93 GB из 7,52 GB системного WAL (92%). Остальное — служебные/фоновые операции.
+
+| Запрос | Вызовов | WAL, GB | Доля WAL | Комментарий |
+|---|---:|---:|---:|---|
+| `UPDATE ip` (refresh) | 866 105 | **2,378** | **31,6%** | строк изменено 108 тыс.; остальные вызовы — 0 строк |
+| `UPDATE domain` (resolv_count) | 717 000 | **1,429** | **19,0%** | 1 строка + индексы, HOT 0% |
+| `INSERT domain_stat` (batch) | 54 728 | **1,276** | **17,0%** | 454 тыс. строк, в среднем 8,3 строки/вызов |
+| `INSERT ip` (DO NOTHING) | 866 105 | **0,603** | **8,0%** | 47,9 тыс. новых IP |
+| `UPDATE domain last_seen` (batch) | 1 434 | **0,587** | **7,8%** | ~113 тыс. строк |
+| `DELETE domain_stat` | 22 | **0,487** | **6,5%** | retention, 415 тыс. строк |
+| `DELETE ip` (retention) | 22 | **0,107** | **1,4%** | 33,9 тыс. строк |
+| `DELETE ip` (старые домены) | 22 | **0,047** | **0,6%** | — |
+| `DELETE domain` | 22 | **0,00006** | ~0% | — |
+| Прочее / вне `pgss` | — | **~0,60** | **~8%** | — |
+
+Ключевые наблюдения:
+
+- **IP-апдейт всё ещё самый дорогой запрос**, хотя строк изменено всего 108 тыс.: 866 тыс. вызовов `UPDATE ip` на каждый успешный резолв IPv4/IPv6. Индексы `ip.time`/`ip.type` не дают HOT, поэтому 108 тыс. реальных обновлений дают 2,38 GB WAL.
+- **`domain`-счётчик** — 717 тыс. вызовов и 1,43 GB WAL. Это плановая часть резолвера, которую нельзя убрать без изменения логики подсчёта.
+- **`domain_stat`** теперь пишется батчами: 54,7 тыс. вызовов вместо 412 тыс., но средний батч — 8,3 строки (трафик 5,26 пакета/с, flush раз в секунду). 1,28 GB WAL — это в основном индексы на 454 тыс. строк.
+- **`last_seen`** — 1 434 batch-вызова и 0,59 GB WAL вместо 412 тыс. отдельных UPDATE; осталось ~113 тыс. изменённых строк.
+- **`INSERT INTO domain`** — 5 466 вызовов вместо 412 тыс.; кэш доменов отработал.
+
+## 4. Диск, checkpoint, буферы
+
+| Метрика | Baseline | 2.9.0 |
+|---|---:|---:|
+| Запись `sdb1` | 89,08 GB/сутки | **36,60 GB/сутки** |
+| Чтение `sdb1` | 49,9 GB/сутки | **15,92 GB/сутки** |
+| `sdb1` write | 1,03 MB/s | **0,424 MB/s** |
+| Буферы: checkpoint / bgwriter / backend | 20,7M / 10,9M / — | **1,19M / 1,06M / 0,33M** |
+| `checkpoint_write_time` | 90,1% | **90,0%** |
+| Checkpoint’ов timed / req | 288 / 0 | **288 / 0** |
+| WAL FPI | 2,45M (за 24ч) | **2,45M** |
+| `wal_buffers_full` | — | 11 802 |
+| Cache hit | ~94% | **93,62%** |
+
+Физическая запись на `sdb1` — **36,6 GB/сутки** при WAL 7,52 GB, то есть **4,87× WAL**. В baseline было 4,28×. Абсолютная запись упала, но коэффициент усилился: дают о себе знать ZFS `volblocksize=16K`, checkpoint-поток и индексы. Это аргумент не откладывать ZFS 8K и тюнинг checkpoint.
+
+Checkpoint’ы остаются плановыми каждые 5 минут; `checkpoint_write_time` = 77 730 106 мс за 23,98 ч = 90,0% календарного времени. `checkpoint_sync_time` = 9,2 с — sync не проблема.
+
+## 5. Autovacuum
+
+| Таблица | autovacuum_count | dead tuples | n_live_tup | Комментарий |
+|---|---:|---:|---:|---|
+| `domain` | **3 750** | 1 357 | 26 432 | 831 тыс. UPDATE → очень частый autovacuum |
+| `ip` | 252 | **67 233** | 443 166 | 108 тыс. UPDATE + 48 тыс. INSERT |
+| `domain_stat` | 10 | **499 380** | 3 157 753 | 415 тыс. DELETE, порог 20% не достигается |
+
+`n_live_tup` — оценка `pg_stat_user_tables`; фактическое число доменов по метрике — 16 457.
+
+Autovacuum worker прочитал **35,2 млн блоков** (≈288 GB логически) — 93,8% всех чтений; записал 251 тыс. блоков (≈2,0 GB). По `domain` autovacuum запускается каждые ~23 секунды; это следствие не-HOT UPDATE и индексов на изменяемых столбцах. `domain_stat` по-прежнему не успевает вакуумироваться: 499 тыс. dead tuples — 13,7% (live+dead), ниже порога 20%.
+
+## 6. Размеры и индексы
+
+БД: **7 759 MB**; heap ~512 MB, индексы **7 237 MB (93,3%)**.
+
+| Индекс | Размер | `idx_scan` | Вывод |
+|---|---:|---:|---|
+| `idx_domain_stat_time_domain` | 2 064 MB | 46 | заменить на `(domain, timestamp)` после партиционирования |
+| `idx_domain_stat_time_client` | 1 301 MB | **0** | удалить |
+| `idx_ip_time_cleanup` | 484 MB | **0** | удалить/заменить |
+| `idx_ip_time` | 483 MB | **0** | удалить |
+| `idx_domain_stat_timestamp` | 422 MB | 338 | оставить до партиционирования |
+| `domain_stat_pkey` | 404 MB | **0** | не нужен |
+| `idx_domain_stat_client_ip` | 208 MB | **0** | удалить |
+| `idx_domain_stat_domain` | 206 MB | 1 | удалить |
+| `idx_domain_stat_rtype` | 191 MB | **0** | удалить |
+| `idx_domain_name` | 224 MB | 5,35 млн | дубль unique-индекса, удалить |
+| `idx_domain_last_seen` | 264 MB | 1 304 | кандидат на удаление: тормозит HOT |
+| `idx_ip_domain` | 25 MB | 0 | дубль `idx_ip_domain_id`, удалить |
+
+Без замены можно убрать около **4 GB**; ещё **2,06 GB** (`time_domain`) нужно заменить после партиционирования. Это совпадает с оценкой baseline (~5,8 GB).
+
+## 7. Что сработало
+
+1. Кэш доменов: `INSERT INTO domain` — 5 466 вызовов на 454 тыс. пакетов (98,8% cache hit).
+2. Батчинг `domain_stat`: 54,7 тыс. вызовов вместо 412 тыс.
+3. Троттлинг `last_seen`: 1 434 batch-вызова и 113 тыс. строк вместо 412 тыс. отдельных UPDATE.
+4. IP-refresh раз в сутки: 108 тыс. фактических UPDATE вместо 1,72 млн; суммарно IP-WAL (update+insert) 2,98 GB против 14,28 GB в baseline (−79%).
+5. WAL/диск/буферы: −64% / −59% / −58%.
+
+## 8. Что осталось
+
+1. **`UPDATE ip` — 31,6% WAL** при 108 тыс. изменённых строк. Нужно не выполнять `UPDATE` на каждый резолв, если нет адресов старше `ip_refresh_hours`; кэшировать время refresh или объединять IPv4/IPv6 в одну транзакцию.
+2. **`domain.resolv_count`** — 717 тыс. UPDATE и 1,43 GB WAL; индексы на `resolv_count/last_resolv_time` запрещают HOT.
+3. **`domain_stat`** — 1,28 GB WAL на INSERT и 0,49 GB на DELETE; 4,8 GB индексов, 499 тыс. dead tuples.
+4. **Checkpoint 90%** и физическая запись 4,87× WAL — ZFS 16K + checkpoint-поток.
+5. **Autovacuum `domain`** — 3 750 проходов/сутки; после удаления индексов и `fillfactor` должен резко упасть.
+
+## 9. Этап 2 — предлагаемый порядок
+
+### 2.1. Индексы, низкий риск
+
+В maintenance window, с бэкапом и `DROP INDEX CONCURRENTLY`:
+
+- `domain`: `idx_domain_name`, `idx_domain_time_insert`, `idx_domain_resolv_lookup`, `idx_domain_resolv_count`, `idx_domain_resolv`, `idx_domain_last_seen`.
+- `ip`: `idx_ip_time`, `idx_ip_time_cleanup`, `idx_ip_domain`.
+- `domain_stat`: `idx_domain_stat_time_client`, `domain_stat_pkey`, `idx_domain_stat_client_ip`, `idx_domain_stat_domain`, `idx_domain_stat_rtype`.
+
+Перед удалением проверить `EXPLAIN` для cleanup/resolver/export на копии или в транзакции; `idx_domain_stat_timestamp` и `idx_domain_last_resolv_time` пока оставить.
+
+### 2.2. HOT и `fillfactor`
+
+- `ALTER TABLE domain SET (fillfactor=70)`, `ALTER TABLE ip SET (fillfactor=70)`.
+- После удаления индексов на изменяемых столбцах проверить `n_tup_hot_upd`; при необходимости `VACUUM`/`pg_repack` без долгой блокировки.
+
+### 2.3. `domain_stat` — партиционирование
+
+- Партиции по дню/месяцу, retention через `DROP PARTITION` вместо `DELETE`.
+- Индексы на партициях: `(timestamp)`, `(domain, timestamp)`; pkey не нужен.
+- Это уберёт 415 тыс. DELETE/сутки, 0,49 GB WAL и 499 тыс. dead tuples.
+
+### 2.4. PostgreSQL и ZFS
+
+- `shared_buffers` 4 GB, `checkpoint_timeout` 15 мин, `bgwriter_lru_maxpages` 1000, `jit=off`, per-table autovacuum.
+- ZFS `volblocksize=8K` — только через backup/recreate dataset, отдельное maintenance-окно.
+
+### 2.5. Код
+
+- `UpsertIPs`: не выполнять `UPDATE`, если ни один адрес не старше `ip_refresh_hours`; одна транзакция на домен вместо двух (IPv4+IPv6).
+- Рассмотреть батчинг `domain.resolv_count` (рискованно, отдельный этап) и увеличение flush-интервала `domain_stat` до 5 с при росте трафика.
+
+## 10. Критерии следующего замера
+
+После этапа 2 повторить 24-часовой профиль и проверить:
+
+- WAL < 4 GB/сутки;
+- `sdb1` < 25 GB/сутки;
+- `checkpoint_write_time` < 70%;
+- `domain` autovacuum < 1 000/сутки;
+- `domain_stat` dead tuples < 100 тыс.;
+- HOT > 50% для `domain`/`ip`;
+- отсутствие роста UDP-дропов и ошибок резолвера.
+
+## 11. Данные
+
+Сырые данные: [docs/baseline/2026-11-25/2026-11-24](baseline/2026-11-25/2026-11-24/).
+
+- `meta.txt`, `monitor.log`, `errors.log`;
+- `pg_stat_statements.csv.gz`, `tables.csv`, `pg_stat_io.csv`;
+- `system.csv`, `disk.csv`, `docker.csv`;
+- `collector-metrics.log.gz`, `web-api-metrics.log.gz`;
+- `analysis.json`.
+
+`analyze_pg_monitoring.py` теперь понимает `.log.gz` для `collector-metrics`.
