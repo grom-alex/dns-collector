@@ -1,0 +1,1381 @@
+{
+  "data_dir": "/Users/grom_a/Projects/dns-collector/docs/baseline/2026-11-25/2026-11-24",
+  "window": {
+    "start": "2026-11-24T06:39:48Z",
+    "end": "2026-11-25T06:38:32Z",
+    "hours": 23.97888888888889,
+    "samples": 286,
+    "pgss_rows": 130309
+  },
+  "system": {
+    "checkpoints_timed": {
+      "delta": 288.0,
+      "per_day": 288.2535563690283,
+      "per_sec": 0.00333626801353042
+    },
+    "checkpoints_req": {
+      "delta": 0.0,
+      "per_day": 0.0,
+      "per_sec": 0.0
+    },
+    "checkpoint_write_time": {
+      "delta": 77730106.0,
+      "per_day": 77798539.9008387,
+      "per_sec": 900.4460636671146
+    },
+    "checkpoint_sync_time": {
+      "delta": 9157.0,
+      "per_day": 9165.061859969417,
+      "per_sec": 0.10607710486075715
+    },
+    "buffers_checkpoint": {
+      "delta": 1191229.0,
+      "per_day": 1192277.7628469486,
+      "per_sec": 13.799511144061906
+    },
+    "buffers_clean": {
+      "delta": 1063121.0,
+      "per_day": 1064056.9760437422,
+      "per_sec": 12.315474259765535
+    },
+    "buffers_backend": {
+      "delta": 328490.0,
+      "per_day": 328779.2039293823,
+      "per_sec": 3.8053148602937767
+    },
+    "buffers_alloc": {
+      "delta": 1766866.0,
+      "per_day": 1768421.5559983319,
+      "per_sec": 20.467842083314025
+    },
+    "wal_records": {
+      "delta": 17610944.0,
+      "per_day": 17626448.746582642,
+      "per_sec": 204.0098234558176
+    },
+    "wal_fpi": {
+      "delta": 2450275.0,
+      "per_day": 2452432.232055975,
+      "per_sec": 28.384632315462675
+    },
+    "wal_bytes": {
+      "delta": 7522962938.0,
+      "per_day": 7529586185.107271,
+      "per_sec": 87147.98825355637
+    },
+    "wal_buffers_full": {
+      "delta": 11802.0,
+      "per_day": 11812.390528705806,
+      "per_sec": 0.136717482971132
+    },
+    "wal_write": {
+      "delta": 812861.0,
+      "per_day": 813576.6461239052,
+      "per_sec": 9.41639636717483
+    },
+    "wal_sync": {
+      "delta": 799533.0,
+      "per_day": 800236.9120986052,
+      "per_sec": 9.26200129743756
+    },
+    "blks_read": {
+      "delta": 37505376.0,
+      "per_day": 37538395.88526945,
+      "per_sec": 434.472174598026
+    },
+    "blks_hit": {
+      "delta": 550397982.0,
+      "per_day": 550882554.6174877,
+      "per_sec": 6375.955493257959
+    },
+    "xact_commit": {
+      "delta": 2559835.0,
+      "per_day": 2562088.689124693,
+      "per_sec": 29.65380427227654
+    },
+    "xact_rollback": {
+      "delta": 32.0,
+      "per_day": 32.02817292989204,
+      "per_sec": 0.00037069644594782446
+    },
+    "tup_inserted": {
+      "delta": 503244.0,
+      "per_day": 503687.0580603308,
+      "per_sec": 5.829711320142718
+    },
+    "tup_updated": {
+      "delta": 940432.0,
+      "per_day": 941259.9601501322,
+      "per_sec": 10.89421250173764
+    },
+    "tup_deleted": {
+      "delta": 450001.0,
+      "per_day": 450397.1827070108,
+      "per_sec": 5.212930355405217
+    },
+    "pgss_dealloc": {
+      "delta": 0.0,
+      "per_day": 0.0,
+      "per_sec": 0.0
+    }
+  },
+  "buffers": {
+    "total": 2582840.0,
+    "gb": 21.15862528,
+    "gb_day": 21.17725341958204
+  },
+  "checkpoint_write_pct": 90.04460636671146,
+  "cache_hit_pct": 93.62048617521249,
+  "tables": {
+    "schema_migrations": {
+      "first": "2026-11-24T06:39:48Z",
+      "last": "2026-11-25T06:38:32Z",
+      "n_live_tup": 0.0,
+      "n_dead_tup": 0.0,
+      "ins": 0.0,
+      "upd": 0.0,
+      "hot": 0.0,
+      "del": 0.0,
+      "upd_per_day": 0.0,
+      "del_per_day": 0.0,
+      "hot_pct": 0,
+      "autovacuum_count": 0.0
+    },
+    "domain_stat": {
+      "first": "2026-11-24T06:39:48Z",
+      "last": "2026-11-25T06:38:32Z",
+      "n_live_tup": 3175590.0,
+      "n_dead_tup": 478883.0,
+      "ins": 454210.0,
+      "upd": 0.0,
+      "hot": 0.0,
+      "del": 415074.0,
+      "upd_per_day": 0.0,
+      "del_per_day": 415439.4328344377,
+      "hot_pct": 0,
+      "autovacuum_count": 10.0
+    },
+    "domain": {
+      "first": "2026-11-24T06:39:48Z",
+      "last": "2026-11-25T06:38:32Z",
+      "n_live_tup": 26530.0,
+      "n_dead_tup": 14.0,
+      "ins": 566.0,
+      "upd": 830497.0,
+      "hot": 0.0,
+      "del": 517.0,
+      "upd_per_day": 831228.1729298921,
+      "del_per_day": 517.4551688985682,
+      "hot_pct": 0.0,
+      "autovacuum_count": 3749.0
+    },
+    "ip": {
+      "first": "2026-11-24T06:39:48Z",
+      "last": "2026-11-25T06:38:32Z",
+      "n_live_tup": 444024.0,
+      "n_dead_tup": 60589.0,
+      "ins": 47916.0,
+      "upd": 107994.0,
+      "hot": 0.0,
+      "del": 33858.0,
+      "upd_per_day": 108089.07835596125,
+      "del_per_day": 33887.80872063389,
+      "hot_pct": 0.0,
+      "autovacuum_count": 252.0
+    }
+  },
+  "disk": {
+    "sdb1": {
+      "written_gb": 36.566016,
+      "read_gb": 15.902277632,
+      "written_gb_day": 36.598208868912465,
+      "read_gb_day": 15.916278061776563,
+      "write_mb_s": 0.4235903804272277,
+      "read_mb_s": 0.18421618127056205
+    },
+    "sda1": {
+      "written_gb": 1.672507392,
+      "read_gb": 0.131616768,
+      "written_gb_day": 1.673979874296835,
+      "read_gb_day": 0.13173264393679623,
+      "write_mb_s": 0.019374767063620776,
+      "read_mb_s": 0.001524683378898105
+    }
+  },
+  "io": {
+    "autovacuum launcher|relation|bulkread": {
+      "reads": 0.0,
+      "read_time_ms": 0.0,
+      "writes": 0.0,
+      "write_time_ms": 0.0,
+      "writebacks": 0.0,
+      "extends": 0.0,
+      "fsyncs": 0.0
+    },
+    "autovacuum launcher|relation|normal": {
+      "reads": 0.0,
+      "read_time_ms": 0.0,
+      "writes": 0.0,
+      "write_time_ms": 0.0,
+      "writebacks": 0.0,
+      "extends": 0.0,
+      "fsyncs": 0.0
+    },
+    "autovacuum worker|relation|bulkread": {
+      "reads": 0.0,
+      "read_time_ms": 0.0,
+      "writes": 0.0,
+      "write_time_ms": 0.0,
+      "writebacks": 0.0,
+      "extends": 0.0,
+      "fsyncs": 0.0
+    },
+    "autovacuum worker|relation|normal": {
+      "reads": 99126.0,
+      "read_time_ms": 1580.208,
+      "writes": 968.0,
+      "write_time_ms": 8.479000000000001,
+      "writebacks": 0.0,
+      "extends": 20.0,
+      "fsyncs": 0.0
+    },
+    "autovacuum worker|relation|vacuum": {
+      "reads": 35194793.0,
+      "read_time_ms": 81588.134,
+      "writes": 251036.0,
+      "write_time_ms": 1387.9850000000001,
+      "writebacks": 0.0,
+      "extends": 0.0,
+      "fsyncs": 0.0
+    },
+    "client backend|relation|bulkread": {
+      "reads": 381757.0,
+      "read_time_ms": 3087.589,
+      "writes": 1906.0,
+      "write_time_ms": 12.126,
+      "writebacks": 0.0,
+      "extends": 0.0,
+      "fsyncs": 0.0
+    },
+    "client backend|relation|bulkwrite": {
+      "reads": 0.0,
+      "read_time_ms": 0.0,
+      "writes": 0.0,
+      "write_time_ms": 0.0,
+      "writebacks": 0.0,
+      "extends": 0.0,
+      "fsyncs": 0.0
+    },
+    "client backend|relation|normal": {
+      "reads": 1616908.0,
+      "read_time_ms": 95944.714,
+      "writes": 72414.0,
+      "write_time_ms": 524.534,
+      "writebacks": 0.0,
+      "extends": 470.0,
+      "fsyncs": 0.0
+    },
+    "client backend|relation|vacuum": {
+      "reads": 0.0,
+      "read_time_ms": 0.0,
+      "writes": 0.0,
+      "write_time_ms": 0.0,
+      "writebacks": 0.0,
+      "extends": 0.0,
+      "fsyncs": 0.0
+    },
+    "client backend|temp relation|normal": {
+      "reads": 0.0,
+      "read_time_ms": 0.0,
+      "writes": 0.0,
+      "write_time_ms": 0.0,
+      "writebacks": 0.0,
+      "extends": 0.0,
+      "fsyncs": 0.0
+    },
+    "background worker|relation|bulkread": {
+      "reads": 195805.0,
+      "read_time_ms": 1033.343,
+      "writes": 1207.0,
+      "write_time_ms": 6.37,
+      "writebacks": 0.0,
+      "extends": 0.0,
+      "fsyncs": 0.0
+    },
+    "background worker|relation|bulkwrite": {
+      "reads": 0.0,
+      "read_time_ms": 0.0,
+      "writes": 0.0,
+      "write_time_ms": 0.0,
+      "writebacks": 0.0,
+      "extends": 0.0,
+      "fsyncs": 0.0
+    },
+    "background worker|relation|normal": {
+      "reads": 16997.0,
+      "read_time_ms": 201.121,
+      "writes": 466.0,
+      "write_time_ms": 2.978,
+      "writebacks": 0.0,
+      "extends": 0.0,
+      "fsyncs": 0.0
+    },
+    "background worker|relation|vacuum": {
+      "reads": 0.0,
+      "read_time_ms": 0.0,
+      "writes": 0.0,
+      "write_time_ms": 0.0,
+      "writebacks": 0.0,
+      "extends": 0.0,
+      "fsyncs": 0.0
+    },
+    "background worker|temp relation|normal": {
+      "reads": 0.0,
+      "read_time_ms": 0.0,
+      "writes": 0.0,
+      "write_time_ms": 0.0,
+      "writebacks": 0.0,
+      "extends": 0.0,
+      "fsyncs": 0.0
+    },
+    "background writer|relation|normal": {
+      "reads": 0.0,
+      "read_time_ms": 0.0,
+      "writes": 1063110.0,
+      "write_time_ms": 12182.64,
+      "writebacks": 1063104.0,
+      "extends": 0.0,
+      "fsyncs": 0.0
+    },
+    "checkpointer|relation|normal": {
+      "reads": 0.0,
+      "read_time_ms": 0.0,
+      "writes": 1191228.0,
+      "write_time_ms": 20808.662,
+      "writebacks": 1191240.0,
+      "extends": 0.0,
+      "fsyncs": 14434.0
+    },
+    "standalone backend|relation|bulkread": {
+      "reads": 0.0,
+      "read_time_ms": 0.0,
+      "writes": 0.0,
+      "write_time_ms": 0.0,
+      "writebacks": 0.0,
+      "extends": 0.0,
+      "fsyncs": 0.0
+    },
+    "standalone backend|relation|bulkwrite": {
+      "reads": 0.0,
+      "read_time_ms": 0.0,
+      "writes": 0.0,
+      "write_time_ms": 0.0,
+      "writebacks": 0.0,
+      "extends": 0.0,
+      "fsyncs": 0.0
+    },
+    "standalone backend|relation|normal": {
+      "reads": 0.0,
+      "read_time_ms": 0.0,
+      "writes": 0.0,
+      "write_time_ms": 0.0,
+      "writebacks": 0.0,
+      "extends": 0.0,
+      "fsyncs": 0.0
+    },
+    "standalone backend|relation|vacuum": {
+      "reads": 0.0,
+      "read_time_ms": 0.0,
+      "writes": 0.0,
+      "write_time_ms": 0.0,
+      "writebacks": 0.0,
+      "extends": 0.0,
+      "fsyncs": 0.0
+    },
+    "startup|relation|bulkread": {
+      "reads": 0.0,
+      "read_time_ms": 0.0,
+      "writes": 0.0,
+      "write_time_ms": 0.0,
+      "writebacks": 0.0,
+      "extends": 0.0,
+      "fsyncs": 0.0
+    },
+    "startup|relation|bulkwrite": {
+      "reads": 0.0,
+      "read_time_ms": 0.0,
+      "writes": 0.0,
+      "write_time_ms": 0.0,
+      "writebacks": 0.0,
+      "extends": 0.0,
+      "fsyncs": 0.0
+    },
+    "startup|relation|normal": {
+      "reads": 0.0,
+      "read_time_ms": 0.0,
+      "writes": 0.0,
+      "write_time_ms": 0.0,
+      "writebacks": 0.0,
+      "extends": 0.0,
+      "fsyncs": 0.0
+    },
+    "startup|relation|vacuum": {
+      "reads": 0.0,
+      "read_time_ms": 0.0,
+      "writes": 0.0,
+      "write_time_ms": 0.0,
+      "writebacks": 0.0,
+      "extends": 0.0,
+      "fsyncs": 0.0
+    },
+    "walsender|relation|bulkread": {
+      "reads": 0.0,
+      "read_time_ms": 0.0,
+      "writes": 0.0,
+      "write_time_ms": 0.0,
+      "writebacks": 0.0,
+      "extends": 0.0,
+      "fsyncs": 0.0
+    },
+    "walsender|relation|bulkwrite": {
+      "reads": 0.0,
+      "read_time_ms": 0.0,
+      "writes": 0.0,
+      "write_time_ms": 0.0,
+      "writebacks": 0.0,
+      "extends": 0.0,
+      "fsyncs": 0.0
+    },
+    "walsender|relation|normal": {
+      "reads": 0.0,
+      "read_time_ms": 0.0,
+      "writes": 0.0,
+      "write_time_ms": 0.0,
+      "writebacks": 0.0,
+      "extends": 0.0,
+      "fsyncs": 0.0
+    },
+    "walsender|relation|vacuum": {
+      "reads": 0.0,
+      "read_time_ms": 0.0,
+      "writes": 0.0,
+      "write_time_ms": 0.0,
+      "writebacks": 0.0,
+      "extends": 0.0,
+      "fsyncs": 0.0
+    },
+    "walsender|temp relation|normal": {
+      "reads": 0.0,
+      "read_time_ms": 0.0,
+      "writes": 0.0,
+      "write_time_ms": 0.0,
+      "writebacks": 0.0,
+      "extends": 0.0,
+      "fsyncs": 0.0
+    }
+  },
+  "pgss": {
+    "queries": 886,
+    "calls_sum": 4254927.0,
+    "wal_sum": 6928403036.0,
+    "top_wal": [
+      {
+        "queryid": "7518082328173282084",
+        "calls": 866105.0,
+        "wal_bytes": 2377590296.0,
+        "wal_per_call": 2745.1524884396235,
+        "total_exec_time_ms": 46273.28331799939,
+        "mean_exec_time_ms": 0.05342687470687664,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "UPDATE ip SET time = $4::timestamp WHERE domain_id = $1 AND type = $3 AND ip = ANY($2::text[]) AND time < $4::timestamp - make_interval(secs => $5)"
+      },
+      {
+        "queryid": "-2889759745800607483",
+        "calls": 717000.0,
+        "wal_bytes": 1429337146.0,
+        "wal_per_call": 1993.4967168758717,
+        "total_exec_time_ms": 106296.09205100223,
+        "mean_exec_time_ms": 0.14825117440865024,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "UPDATE domain SET resolv_count = CASE WHEN resolv_count >= max_resolv - $3 THEN CAST(max_resolv * $4 / $5 AS INTEGER) ELSE resolv_count + $6 END, last_resolv_time = $1 WHERE id = $2"
+      },
+      {
+        "queryid": "772264339515701725",
+        "calls": 54728.0,
+        "wal_bytes": 1276010716.0,
+        "wal_per_call": 23315.500584709836,
+        "total_exec_time_ms": 55047.652975999874,
+        "mean_exec_time_ms": 1.0058407574915924,
+        "first_ts": "2026-11-24T06:39:48Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "INSERT INTO domain_stat (domain, client_ip, rtype, timestamp) SELECT * FROM unnest($1::text[], $2::text[], $3::text[], $4::timestamp[])"
+      },
+      {
+        "queryid": "-672482952154436172",
+        "calls": 866105.0,
+        "wal_bytes": 603340014.0,
+        "wal_per_call": 696.6130134337061,
+        "total_exec_time_ms": 129313.87028500975,
+        "mean_exec_time_ms": 0.14930507303965426,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "INSERT INTO ip (domain_id, ip, type, time) SELECT $1, unnest($2::text[]), $3, $4::timestamp ON CONFLICT (domain_id, ip) DO NOTHING"
+      },
+      {
+        "queryid": "-3824966847829633169",
+        "calls": 1434.0,
+        "wal_bytes": 587051670.0,
+        "wal_per_call": 409380.5230125523,
+        "total_exec_time_ms": 5360.28999499999,
+        "mean_exec_time_ms": 3.737998601813103,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "UPDATE domain d SET last_seen = v.ts FROM (SELECT * FROM unnest($1::bigint[], $2::timestamp[]) AS v(id, ts)) v WHERE d.id = v.id AND (d.last_seen IS NULL OR d.last_seen < v.ts - make_interval(secs => $3))"
+      },
+      {
+        "queryid": "-3690701910270496501",
+        "calls": 22.0,
+        "wal_bytes": 487357228.0,
+        "wal_per_call": 22152601.272727273,
+        "total_exec_time_ms": 18991.596356000002,
+        "mean_exec_time_ms": 863.2543798181819,
+        "first_ts": "2026-11-24T07:40:23Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "DELETE FROM domain_stat WHERE timestamp < $1"
+      },
+      {
+        "queryid": "-243670337831077886",
+        "calls": 22.0,
+        "wal_bytes": 107328082.0,
+        "wal_per_call": 4878549.181818182,
+        "total_exec_time_ms": 3765.5301430000004,
+        "mean_exec_time_ms": 171.16046104545455,
+        "first_ts": "2026-11-24T07:40:23Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "DELETE FROM ip WHERE time < $1 AND domain_id IN ( SELECT id FROM domain WHERE last_seen >= $1 )"
+      },
+      {
+        "queryid": "-8666136926763094110",
+        "calls": 22.0,
+        "wal_bytes": 47145640.0,
+        "wal_per_call": 2142983.6363636362,
+        "total_exec_time_ms": 343.36400799999996,
+        "mean_exec_time_ms": 15.607454909090906,
+        "first_ts": "2026-11-24T07:40:23Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "DELETE FROM ip WHERE domain_id IN ( SELECT id FROM domain WHERE last_seen IS NOT NULL AND last_seen < $1 )"
+      },
+      {
+        "queryid": "-282526941459313815",
+        "calls": 2868.0,
+        "wal_bytes": 5822767.0,
+        "wal_per_call": 2030.2534867503487,
+        "total_exec_time_ms": 12090.352738000034,
+        "mean_exec_time_ms": 4.215604162482578,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "SELECT COUNT(*) FROM domain"
+      },
+      {
+        "queryid": "-6199310323040239320",
+        "calls": 2868.0,
+        "wal_bytes": 4975778.0,
+        "wal_per_call": 1734.9295676429567,
+        "total_exec_time_ms": 118424.33328200007,
+        "mean_exec_time_ms": 41.291608536262224,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "SELECT COUNT(*) FROM ip"
+      },
+      {
+        "queryid": "5671446838281400468",
+        "calls": 5466.0,
+        "wal_bytes": 2377258.0,
+        "wal_per_call": 434.9173069886572,
+        "total_exec_time_ms": 2122.7945680000034,
+        "mean_exec_time_ms": 0.38836344090742836,
+        "first_ts": "2026-11-24T06:39:48Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "INSERT INTO domain (domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen) VALUES ($1, $2, $6, $3, $4, $5) ON CONFLICT (domain) DO NOTHING RETURNING id, domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen"
+      },
+      {
+        "queryid": "-6826981711843330272",
+        "calls": 22.0,
+        "wal_bytes": 63066.0,
+        "wal_per_call": 2866.6363636363635,
+        "total_exec_time_ms": 32.636037,
+        "mean_exec_time_ms": 1.4834562272727274,
+        "first_ts": "2026-11-24T07:40:23Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "DELETE FROM domain WHERE last_seen IS NOT NULL AND last_seen < $1"
+      },
+      {
+        "queryid": "-3203277695778702346",
+        "calls": 4941.0,
+        "wal_bytes": 3316.0,
+        "wal_per_call": 0.6711192066383324,
+        "total_exec_time_ms": 128.6138799999997,
+        "mean_exec_time_ms": 0.026029929164136757,
+        "first_ts": "2026-11-24T06:39:48Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen FROM domain WHERE domain = $1"
+      },
+      {
+        "queryid": "-3540699302104881106",
+        "calls": 717.0,
+        "wal_bytes": 59.0,
+        "wal_per_call": 0.08228730822873083,
+        "total_exec_time_ms": 1683.2542220000007,
+        "mean_exec_time_ms": 2.347634898186891,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen FROM domain WHERE resolv_count < max_resolv OR (resolv_count >= max_resolv AND last_resolv_time < $1) ORDER BY last_resolv_time ASC LIMIT $2"
+      },
+      {
+        "queryid": "2344227130753548125",
+        "calls": 0.0,
+        "wal_bytes": 0.0,
+        "wal_per_call": 0,
+        "total_exec_time_ms": 0.0,
+        "mean_exec_time_ms": 0,
+        "first_ts": "2026-11-24T06:39:48Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "SELECT pg_stat_reset_shared($1) AS io_reset"
+      },
+      {
+        "queryid": "8315322574555789665",
+        "calls": 0.0,
+        "wal_bytes": 0.0,
+        "wal_per_call": 0,
+        "total_exec_time_ms": 0.0,
+        "mean_exec_time_ms": 0,
+        "first_ts": "2026-11-24T06:39:48Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "SELECT pg_stat_statements_reset() AS pgss_reset_at"
+      },
+      {
+        "queryid": "1830575299993446786",
+        "calls": 0.0,
+        "wal_bytes": 0.0,
+        "wal_per_call": 0,
+        "total_exec_time_ms": 0.0,
+        "mean_exec_time_ms": 0,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "COPY (SELECT '2026-11-24T06:39:48Z'::text AS ts, queryid, calls, rows, total_exec_time, mean_exec_time, wal_records, wal_fpi, wal_bytes, shared_blks_hit, shared_blks_read, shared_blks_dirtied, shared_blks_written, temp_blks_read, temp_blks_written, blk_read_time, blk_write_time, left(query, 1000) AS query FROM pg_stat_statements) TO STDOUT WITH CSV"
+      },
+      {
+        "queryid": "-7482590907466364317",
+        "calls": 0.0,
+        "wal_bytes": 0.0,
+        "wal_per_call": 0,
+        "total_exec_time_ms": 0.0,
+        "mean_exec_time_ms": 0,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "SELECT calls, wal_bytes, left(regexp_replace(query, $1, $2, $3), $4) FROM pg_stat_statements WHERE query ILIKE $5 OR query ILIKE $6 OR query ILIKE $7 OR query ILIKE $8 OR query ILIKE $9 ORDER BY wal_bytes DESC LIMIT $10"
+      },
+      {
+        "queryid": "-4986828876535133696",
+        "calls": 0.0,
+        "wal_bytes": 0.0,
+        "wal_per_call": 0,
+        "total_exec_time_ms": 0.0,
+        "mean_exec_time_ms": 0,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "COPY (SELECT '2026-11-24T06:39:48Z'::text AS ts, backend_type, object, context, reads, read_time, writes, write_time, writebacks, extends, hits, evictions, reuses, fsyncs FROM pg_stat_io) TO STDOUT WITH CSV"
+      },
+      {
+        "queryid": "-1717105479052937950",
+        "calls": 0.0,
+        "wal_bytes": 0.0,
+        "wal_per_call": 0,
+        "total_exec_time_ms": 0.0,
+        "mean_exec_time_ms": 0,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "COPY (SELECT '2026-11-24T06:39:48Z'::text AS ts, queryid, calls, rows, total_exec_time, mean_exec_time, wal_records, wal_fpi, wal_bytes, shared_blks_hit, shared_blks_read, shared_blks_dirtied, shared_blks_written, temp_blks_read, temp_blks_written, blk_read_time, blk_write_time, left(query, 1000) AS query FROM pg_stat_statements WHERE false) TO STDOUT WITH CSV HEADER"
+      },
+      {
+        "queryid": "2714347560421833848",
+        "calls": 0.0,
+        "wal_bytes": 0.0,
+        "wal_per_call": 0,
+        "total_exec_time_ms": 0.0,
+        "mean_exec_time_ms": 0,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "COPY (SELECT '2026-11-24T06:39:48Z'::text AS ts, relname, n_live_tup, n_dead_tup, n_mod_since_analyze, n_tup_ins, n_tup_upd, n_tup_hot_upd, n_tup_del, autovacuum_count, vacuum_count, analyze_count, last_autovacuum, last_analyze FROM pg_stat_user_tables WHERE false) TO STDOUT WITH CSV HEADER"
+      },
+      {
+        "queryid": "-6913634761107545848",
+        "calls": 866160.0,
+        "wal_bytes": 0.0,
+        "wal_per_call": 0.0,
+        "total_exec_time_ms": 3534.998577997513,
+        "mean_exec_time_ms": 0.004081230463190996,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "BEGIN READ WRITE"
+      },
+      {
+        "queryid": "9032373437922967157",
+        "calls": 284.0,
+        "wal_bytes": 0.0,
+        "wal_per_call": 0.0,
+        "total_exec_time_ms": 34.629751000000006,
+        "mean_exec_time_ms": 0.12193574295774649,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "SELECT $1, (SELECT checkpoints_timed FROM pg_stat_bgwriter), (SELECT checkpoints_req FROM pg_stat_bgwriter), (SELECT checkpoint_write_time FROM pg_stat_bgwriter), (SELECT checkpoint_sync_time FROM pg_stat_bgwriter), (SELECT buffers_checkpoint FROM pg_stat_bgwriter), (SELECT buffers_clean FROM pg_stat_bgwriter), (SELECT buffers_backend FROM pg_stat_bgwriter), (SELECT buffers_alloc FROM pg_stat_bgwriter), (SELECT wal_records FROM pg_stat_wal), (SELECT wal_fpi FROM pg_stat_wal), (SELECT wal_bytes FROM pg_stat_wal), (SELECT wal_buffers_full FROM pg_stat_wal), (SELECT wal_write FROM pg_stat_wal), (SELECT wal_sync FROM pg_stat_wal), (SELECT blks_read FROM pg_stat_database WHERE datname=current_database()), (SELECT blks_hit FROM pg_stat_database WHERE datname=current_database()), (SELECT xact_commit FROM pg_stat_database WHERE datname=current_database()), (SELECT xact_rollback FROM pg_stat_database WHERE datname=current_d"
+      },
+      {
+        "queryid": "2064869707185898531",
+        "calls": 866128.0,
+        "wal_bytes": 0.0,
+        "wal_per_call": 0.0,
+        "total_exec_time_ms": 348.2969110005697,
+        "mean_exec_time_ms": 0.00040213099103200646,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "COMMIT"
+      },
+      {
+        "queryid": "-5320657957474978907",
+        "calls": 0.0,
+        "wal_bytes": 0.0,
+        "wal_per_call": 0,
+        "total_exec_time_ms": 0.0,
+        "mean_exec_time_ms": 0,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "COPY (SELECT '2026-11-24T06:39:48Z'::text AS ts, backend_type, object, context, reads, read_time, writes, write_time, writebacks, extends, hits, evictions, reuses, fsyncs FROM pg_stat_io WHERE false) TO STDOUT WITH CSV HEADER"
+      },
+      {
+        "queryid": "-551863708074935866",
+        "calls": 0.0,
+        "wal_bytes": 0.0,
+        "wal_per_call": 0,
+        "total_exec_time_ms": 0.0,
+        "mean_exec_time_ms": 0,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "SELECT calls, wal_bytes, left(regexp_replace(query, $1, $2, $3), $4) FROM pg_stat_statements WHERE query ILIKE $5 ORDER BY calls DESC LIMIT $6"
+      },
+      {
+        "queryid": "4895720092190146085",
+        "calls": 0.0,
+        "wal_bytes": 0.0,
+        "wal_per_call": 0,
+        "total_exec_time_ms": 0.0,
+        "mean_exec_time_ms": 0,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "COPY (SELECT '2026-11-24T06:39:48Z'::text AS ts, relname, n_live_tup, n_dead_tup, n_mod_since_analyze, n_tup_ins, n_tup_upd, n_tup_hot_upd, n_tup_del, autovacuum_count, vacuum_count, analyze_count, last_autovacuum, last_analyze FROM pg_stat_user_tables) TO STDOUT WITH CSV"
+      },
+      {
+        "queryid": "-5842082094964452115",
+        "calls": 0.0,
+        "wal_bytes": 0.0,
+        "wal_per_call": 0,
+        "total_exec_time_ms": 0.0,
+        "mean_exec_time_ms": 0,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "SELECT query, calls, wal_bytes FROM pg_stat_statements ORDER BY wal_bytes DESC LIMIT $1"
+      },
+      {
+        "queryid": "-1242791579106719356",
+        "calls": 0.0,
+        "wal_bytes": 0.0,
+        "wal_per_call": 0,
+        "total_exec_time_ms": 0.0,
+        "mean_exec_time_ms": 0,
+        "first_ts": "2026-11-24T06:49:54Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "COPY (SELECT '2026-11-24T06:44:51Z'::text AS ts, queryid, calls, rows, total_exec_time, mean_exec_time, wal_records, wal_fpi, wal_bytes, shared_blks_hit, shared_blks_read, shared_blks_dirtied, shared_blks_written, temp_blks_read, temp_blks_written, blk_read_time, blk_write_time, left(query, 1000) AS query FROM pg_stat_statements) TO STDOUT WITH CSV"
+      },
+      {
+        "queryid": "965655683769802287",
+        "calls": 0.0,
+        "wal_bytes": 0.0,
+        "wal_per_call": 0,
+        "total_exec_time_ms": 0.0,
+        "mean_exec_time_ms": 0,
+        "first_ts": "2026-11-24T06:49:54Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "COPY (SELECT '2026-11-24T06:44:51Z'::text AS ts, relname, n_live_tup, n_dead_tup, n_mod_since_analyze, n_tup_ins, n_tup_upd, n_tup_hot_upd, n_tup_del, autovacuum_count, vacuum_count, analyze_count, last_autovacuum, last_analyze FROM pg_stat_user_tables) TO STDOUT WITH CSV"
+      }
+    ],
+    "top_time": [
+      {
+        "queryid": "-672482952154436172",
+        "calls": 866105.0,
+        "wal_bytes": 603340014.0,
+        "wal_per_call": 696.6130134337061,
+        "total_exec_time_ms": 129313.87028500975,
+        "mean_exec_time_ms": 0.14930507303965426,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "INSERT INTO ip (domain_id, ip, type, time) SELECT $1, unnest($2::text[]), $3, $4::timestamp ON CONFLICT (domain_id, ip) DO NOTHING"
+      },
+      {
+        "queryid": "-6199310323040239320",
+        "calls": 2868.0,
+        "wal_bytes": 4975778.0,
+        "wal_per_call": 1734.9295676429567,
+        "total_exec_time_ms": 118424.33328200007,
+        "mean_exec_time_ms": 41.291608536262224,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "SELECT COUNT(*) FROM ip"
+      },
+      {
+        "queryid": "-2889759745800607483",
+        "calls": 717000.0,
+        "wal_bytes": 1429337146.0,
+        "wal_per_call": 1993.4967168758717,
+        "total_exec_time_ms": 106296.09205100223,
+        "mean_exec_time_ms": 0.14825117440865024,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "UPDATE domain SET resolv_count = CASE WHEN resolv_count >= max_resolv - $3 THEN CAST(max_resolv * $4 / $5 AS INTEGER) ELSE resolv_count + $6 END, last_resolv_time = $1 WHERE id = $2"
+      },
+      {
+        "queryid": "772264339515701725",
+        "calls": 54728.0,
+        "wal_bytes": 1276010716.0,
+        "wal_per_call": 23315.500584709836,
+        "total_exec_time_ms": 55047.652975999874,
+        "mean_exec_time_ms": 1.0058407574915924,
+        "first_ts": "2026-11-24T06:39:48Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "INSERT INTO domain_stat (domain, client_ip, rtype, timestamp) SELECT * FROM unnest($1::text[], $2::text[], $3::text[], $4::timestamp[])"
+      },
+      {
+        "queryid": "7518082328173282084",
+        "calls": 866105.0,
+        "wal_bytes": 2377590296.0,
+        "wal_per_call": 2745.1524884396235,
+        "total_exec_time_ms": 46273.28331799939,
+        "mean_exec_time_ms": 0.05342687470687664,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "UPDATE ip SET time = $4::timestamp WHERE domain_id = $1 AND type = $3 AND ip = ANY($2::text[]) AND time < $4::timestamp - make_interval(secs => $5)"
+      },
+      {
+        "queryid": "-3690701910270496501",
+        "calls": 22.0,
+        "wal_bytes": 487357228.0,
+        "wal_per_call": 22152601.272727273,
+        "total_exec_time_ms": 18991.596356000002,
+        "mean_exec_time_ms": 863.2543798181819,
+        "first_ts": "2026-11-24T07:40:23Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "DELETE FROM domain_stat WHERE timestamp < $1"
+      },
+      {
+        "queryid": "-282526941459313815",
+        "calls": 2868.0,
+        "wal_bytes": 5822767.0,
+        "wal_per_call": 2030.2534867503487,
+        "total_exec_time_ms": 12090.352738000034,
+        "mean_exec_time_ms": 4.215604162482578,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "SELECT COUNT(*) FROM domain"
+      },
+      {
+        "queryid": "-3824966847829633169",
+        "calls": 1434.0,
+        "wal_bytes": 587051670.0,
+        "wal_per_call": 409380.5230125523,
+        "total_exec_time_ms": 5360.28999499999,
+        "mean_exec_time_ms": 3.737998601813103,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "UPDATE domain d SET last_seen = v.ts FROM (SELECT * FROM unnest($1::bigint[], $2::timestamp[]) AS v(id, ts)) v WHERE d.id = v.id AND (d.last_seen IS NULL OR d.last_seen < v.ts - make_interval(secs => $3))"
+      },
+      {
+        "queryid": "-243670337831077886",
+        "calls": 22.0,
+        "wal_bytes": 107328082.0,
+        "wal_per_call": 4878549.181818182,
+        "total_exec_time_ms": 3765.5301430000004,
+        "mean_exec_time_ms": 171.16046104545455,
+        "first_ts": "2026-11-24T07:40:23Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "DELETE FROM ip WHERE time < $1 AND domain_id IN ( SELECT id FROM domain WHERE last_seen >= $1 )"
+      },
+      {
+        "queryid": "-6913634761107545848",
+        "calls": 866160.0,
+        "wal_bytes": 0.0,
+        "wal_per_call": 0.0,
+        "total_exec_time_ms": 3534.998577997513,
+        "mean_exec_time_ms": 0.004081230463190996,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "BEGIN READ WRITE"
+      },
+      {
+        "queryid": "5671446838281400468",
+        "calls": 5466.0,
+        "wal_bytes": 2377258.0,
+        "wal_per_call": 434.9173069886572,
+        "total_exec_time_ms": 2122.7945680000034,
+        "mean_exec_time_ms": 0.38836344090742836,
+        "first_ts": "2026-11-24T06:39:48Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "INSERT INTO domain (domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen) VALUES ($1, $2, $6, $3, $4, $5) ON CONFLICT (domain) DO NOTHING RETURNING id, domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen"
+      },
+      {
+        "queryid": "-3540699302104881106",
+        "calls": 717.0,
+        "wal_bytes": 59.0,
+        "wal_per_call": 0.08228730822873083,
+        "total_exec_time_ms": 1683.2542220000007,
+        "mean_exec_time_ms": 2.347634898186891,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen FROM domain WHERE resolv_count < max_resolv OR (resolv_count >= max_resolv AND last_resolv_time < $1) ORDER BY last_resolv_time ASC LIMIT $2"
+      },
+      {
+        "queryid": "-1324618930028755504",
+        "calls": 3.0,
+        "wal_bytes": 0.0,
+        "wal_per_call": 0.0,
+        "total_exec_time_ms": 736.000769,
+        "mean_exec_time_ms": 245.33358966666665,
+        "first_ts": "2026-11-25T00:40:07Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "SELECT DISTINCT domain FROM domain WHERE domain ~ $1 ORDER BY domain"
+      },
+      {
+        "queryid": "-4851280328217969112",
+        "calls": 2.0,
+        "wal_bytes": 0.0,
+        "wal_per_call": 0.0,
+        "total_exec_time_ms": 529.744314,
+        "mean_exec_time_ms": 264.872157,
+        "first_ts": "2026-11-25T00:40:07Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "SELECT DISTINCT ip.ip, ip.type FROM ip INNER JOIN domain ON ip.domain_id = domain.id WHERE domain.domain ~ $1 ORDER BY type, ip"
+      },
+      {
+        "queryid": "2064869707185898531",
+        "calls": 866128.0,
+        "wal_bytes": 0.0,
+        "wal_per_call": 0.0,
+        "total_exec_time_ms": 348.2969110005697,
+        "mean_exec_time_ms": 0.00040213099103200646,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "COMMIT"
+      },
+      {
+        "queryid": "-8666136926763094110",
+        "calls": 22.0,
+        "wal_bytes": 47145640.0,
+        "wal_per_call": 2142983.6363636362,
+        "total_exec_time_ms": 343.36400799999996,
+        "mean_exec_time_ms": 15.607454909090906,
+        "first_ts": "2026-11-24T07:40:23Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "DELETE FROM ip WHERE domain_id IN ( SELECT id FROM domain WHERE last_seen IS NOT NULL AND last_seen < $1 )"
+      },
+      {
+        "queryid": "-3203277695778702346",
+        "calls": 4941.0,
+        "wal_bytes": 3316.0,
+        "wal_per_call": 0.6711192066383324,
+        "total_exec_time_ms": 128.6138799999997,
+        "mean_exec_time_ms": 0.026029929164136757,
+        "first_ts": "2026-11-24T06:39:48Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen FROM domain WHERE domain = $1"
+      },
+      {
+        "queryid": "9032373437922967157",
+        "calls": 284.0,
+        "wal_bytes": 0.0,
+        "wal_per_call": 0.0,
+        "total_exec_time_ms": 34.629751000000006,
+        "mean_exec_time_ms": 0.12193574295774649,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "SELECT $1, (SELECT checkpoints_timed FROM pg_stat_bgwriter), (SELECT checkpoints_req FROM pg_stat_bgwriter), (SELECT checkpoint_write_time FROM pg_stat_bgwriter), (SELECT checkpoint_sync_time FROM pg_stat_bgwriter), (SELECT buffers_checkpoint FROM pg_stat_bgwriter), (SELECT buffers_clean FROM pg_stat_bgwriter), (SELECT buffers_backend FROM pg_stat_bgwriter), (SELECT buffers_alloc FROM pg_stat_bgwriter), (SELECT wal_records FROM pg_stat_wal), (SELECT wal_fpi FROM pg_stat_wal), (SELECT wal_bytes FROM pg_stat_wal), (SELECT wal_buffers_full FROM pg_stat_wal), (SELECT wal_write FROM pg_stat_wal), (SELECT wal_sync FROM pg_stat_wal), (SELECT blks_read FROM pg_stat_database WHERE datname=current_database()), (SELECT blks_hit FROM pg_stat_database WHERE datname=current_database()), (SELECT xact_commit FROM pg_stat_database WHERE datname=current_database()), (SELECT xact_rollback FROM pg_stat_database WHERE datname=current_d"
+      },
+      {
+        "queryid": "-6826981711843330272",
+        "calls": 22.0,
+        "wal_bytes": 63066.0,
+        "wal_per_call": 2866.6363636363635,
+        "total_exec_time_ms": 32.636037,
+        "mean_exec_time_ms": 1.4834562272727274,
+        "first_ts": "2026-11-24T07:40:23Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "DELETE FROM domain WHERE last_seen IS NOT NULL AND last_seen < $1"
+      },
+      {
+        "queryid": "3749380189022910195",
+        "calls": 30.0,
+        "wal_bytes": 0.0,
+        "wal_per_call": 0.0,
+        "total_exec_time_ms": 0.008406,
+        "mean_exec_time_ms": 0.00028020000000000003,
+        "first_ts": "2026-11-24T07:40:23Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "ROLLBACK"
+      }
+    ],
+    "top_calls": [
+      {
+        "queryid": "-6913634761107545848",
+        "calls": 866160.0,
+        "wal_bytes": 0.0,
+        "wal_per_call": 0.0,
+        "total_exec_time_ms": 3534.998577997513,
+        "mean_exec_time_ms": 0.004081230463190996,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "BEGIN READ WRITE"
+      },
+      {
+        "queryid": "2064869707185898531",
+        "calls": 866128.0,
+        "wal_bytes": 0.0,
+        "wal_per_call": 0.0,
+        "total_exec_time_ms": 348.2969110005697,
+        "mean_exec_time_ms": 0.00040213099103200646,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "COMMIT"
+      },
+      {
+        "queryid": "-672482952154436172",
+        "calls": 866105.0,
+        "wal_bytes": 603340014.0,
+        "wal_per_call": 696.6130134337061,
+        "total_exec_time_ms": 129313.87028500975,
+        "mean_exec_time_ms": 0.14930507303965426,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "INSERT INTO ip (domain_id, ip, type, time) SELECT $1, unnest($2::text[]), $3, $4::timestamp ON CONFLICT (domain_id, ip) DO NOTHING"
+      },
+      {
+        "queryid": "7518082328173282084",
+        "calls": 866105.0,
+        "wal_bytes": 2377590296.0,
+        "wal_per_call": 2745.1524884396235,
+        "total_exec_time_ms": 46273.28331799939,
+        "mean_exec_time_ms": 0.05342687470687664,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "UPDATE ip SET time = $4::timestamp WHERE domain_id = $1 AND type = $3 AND ip = ANY($2::text[]) AND time < $4::timestamp - make_interval(secs => $5)"
+      },
+      {
+        "queryid": "-2889759745800607483",
+        "calls": 717000.0,
+        "wal_bytes": 1429337146.0,
+        "wal_per_call": 1993.4967168758717,
+        "total_exec_time_ms": 106296.09205100223,
+        "mean_exec_time_ms": 0.14825117440865024,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "UPDATE domain SET resolv_count = CASE WHEN resolv_count >= max_resolv - $3 THEN CAST(max_resolv * $4 / $5 AS INTEGER) ELSE resolv_count + $6 END, last_resolv_time = $1 WHERE id = $2"
+      },
+      {
+        "queryid": "772264339515701725",
+        "calls": 54728.0,
+        "wal_bytes": 1276010716.0,
+        "wal_per_call": 23315.500584709836,
+        "total_exec_time_ms": 55047.652975999874,
+        "mean_exec_time_ms": 1.0058407574915924,
+        "first_ts": "2026-11-24T06:39:48Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "INSERT INTO domain_stat (domain, client_ip, rtype, timestamp) SELECT * FROM unnest($1::text[], $2::text[], $3::text[], $4::timestamp[])"
+      },
+      {
+        "queryid": "5671446838281400468",
+        "calls": 5466.0,
+        "wal_bytes": 2377258.0,
+        "wal_per_call": 434.9173069886572,
+        "total_exec_time_ms": 2122.7945680000034,
+        "mean_exec_time_ms": 0.38836344090742836,
+        "first_ts": "2026-11-24T06:39:48Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "INSERT INTO domain (domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen) VALUES ($1, $2, $6, $3, $4, $5) ON CONFLICT (domain) DO NOTHING RETURNING id, domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen"
+      },
+      {
+        "queryid": "-3203277695778702346",
+        "calls": 4941.0,
+        "wal_bytes": 3316.0,
+        "wal_per_call": 0.6711192066383324,
+        "total_exec_time_ms": 128.6138799999997,
+        "mean_exec_time_ms": 0.026029929164136757,
+        "first_ts": "2026-11-24T06:39:48Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen FROM domain WHERE domain = $1"
+      },
+      {
+        "queryid": "-6199310323040239320",
+        "calls": 2868.0,
+        "wal_bytes": 4975778.0,
+        "wal_per_call": 1734.9295676429567,
+        "total_exec_time_ms": 118424.33328200007,
+        "mean_exec_time_ms": 41.291608536262224,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "SELECT COUNT(*) FROM ip"
+      },
+      {
+        "queryid": "-282526941459313815",
+        "calls": 2868.0,
+        "wal_bytes": 5822767.0,
+        "wal_per_call": 2030.2534867503487,
+        "total_exec_time_ms": 12090.352738000034,
+        "mean_exec_time_ms": 4.215604162482578,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "SELECT COUNT(*) FROM domain"
+      },
+      {
+        "queryid": "-3824966847829633169",
+        "calls": 1434.0,
+        "wal_bytes": 587051670.0,
+        "wal_per_call": 409380.5230125523,
+        "total_exec_time_ms": 5360.28999499999,
+        "mean_exec_time_ms": 3.737998601813103,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "UPDATE domain d SET last_seen = v.ts FROM (SELECT * FROM unnest($1::bigint[], $2::timestamp[]) AS v(id, ts)) v WHERE d.id = v.id AND (d.last_seen IS NULL OR d.last_seen < v.ts - make_interval(secs => $3))"
+      },
+      {
+        "queryid": "-3540699302104881106",
+        "calls": 717.0,
+        "wal_bytes": 59.0,
+        "wal_per_call": 0.08228730822873083,
+        "total_exec_time_ms": 1683.2542220000007,
+        "mean_exec_time_ms": 2.347634898186891,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "SELECT id, domain, time_insert, resolv_count, max_resolv, last_resolv_time, last_seen FROM domain WHERE resolv_count < max_resolv OR (resolv_count >= max_resolv AND last_resolv_time < $1) ORDER BY last_resolv_time ASC LIMIT $2"
+      },
+      {
+        "queryid": "9032373437922967157",
+        "calls": 284.0,
+        "wal_bytes": 0.0,
+        "wal_per_call": 0.0,
+        "total_exec_time_ms": 34.629751000000006,
+        "mean_exec_time_ms": 0.12193574295774649,
+        "first_ts": "2026-11-24T06:44:51Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "SELECT $1, (SELECT checkpoints_timed FROM pg_stat_bgwriter), (SELECT checkpoints_req FROM pg_stat_bgwriter), (SELECT checkpoint_write_time FROM pg_stat_bgwriter), (SELECT checkpoint_sync_time FROM pg_stat_bgwriter), (SELECT buffers_checkpoint FROM pg_stat_bgwriter), (SELECT buffers_clean FROM pg_stat_bgwriter), (SELECT buffers_backend FROM pg_stat_bgwriter), (SELECT buffers_alloc FROM pg_stat_bgwriter), (SELECT wal_records FROM pg_stat_wal), (SELECT wal_fpi FROM pg_stat_wal), (SELECT wal_bytes FROM pg_stat_wal), (SELECT wal_buffers_full FROM pg_stat_wal), (SELECT wal_write FROM pg_stat_wal), (SELECT wal_sync FROM pg_stat_wal), (SELECT blks_read FROM pg_stat_database WHERE datname=current_database()), (SELECT blks_hit FROM pg_stat_database WHERE datname=current_database()), (SELECT xact_commit FROM pg_stat_database WHERE datname=current_database()), (SELECT xact_rollback FROM pg_stat_database WHERE datname=current_d"
+      },
+      {
+        "queryid": "3749380189022910195",
+        "calls": 30.0,
+        "wal_bytes": 0.0,
+        "wal_per_call": 0.0,
+        "total_exec_time_ms": 0.008406,
+        "mean_exec_time_ms": 0.00028020000000000003,
+        "first_ts": "2026-11-24T07:40:23Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "ROLLBACK"
+      },
+      {
+        "queryid": "-6826981711843330272",
+        "calls": 22.0,
+        "wal_bytes": 63066.0,
+        "wal_per_call": 2866.6363636363635,
+        "total_exec_time_ms": 32.636037,
+        "mean_exec_time_ms": 1.4834562272727274,
+        "first_ts": "2026-11-24T07:40:23Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "DELETE FROM domain WHERE last_seen IS NOT NULL AND last_seen < $1"
+      },
+      {
+        "queryid": "-243670337831077886",
+        "calls": 22.0,
+        "wal_bytes": 107328082.0,
+        "wal_per_call": 4878549.181818182,
+        "total_exec_time_ms": 3765.5301430000004,
+        "mean_exec_time_ms": 171.16046104545455,
+        "first_ts": "2026-11-24T07:40:23Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "DELETE FROM ip WHERE time < $1 AND domain_id IN ( SELECT id FROM domain WHERE last_seen >= $1 )"
+      },
+      {
+        "queryid": "-3690701910270496501",
+        "calls": 22.0,
+        "wal_bytes": 487357228.0,
+        "wal_per_call": 22152601.272727273,
+        "total_exec_time_ms": 18991.596356000002,
+        "mean_exec_time_ms": 863.2543798181819,
+        "first_ts": "2026-11-24T07:40:23Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "DELETE FROM domain_stat WHERE timestamp < $1"
+      },
+      {
+        "queryid": "-8666136926763094110",
+        "calls": 22.0,
+        "wal_bytes": 47145640.0,
+        "wal_per_call": 2142983.6363636362,
+        "total_exec_time_ms": 343.36400799999996,
+        "mean_exec_time_ms": 15.607454909090906,
+        "first_ts": "2026-11-24T07:40:23Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "DELETE FROM ip WHERE domain_id IN ( SELECT id FROM domain WHERE last_seen IS NOT NULL AND last_seen < $1 )"
+      },
+      {
+        "queryid": "-1324618930028755504",
+        "calls": 3.0,
+        "wal_bytes": 0.0,
+        "wal_per_call": 0.0,
+        "total_exec_time_ms": 736.000769,
+        "mean_exec_time_ms": 245.33358966666665,
+        "first_ts": "2026-11-25T00:40:07Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "SELECT DISTINCT domain FROM domain WHERE domain ~ $1 ORDER BY domain"
+      },
+      {
+        "queryid": "-4851280328217969112",
+        "calls": 2.0,
+        "wal_bytes": 0.0,
+        "wal_per_call": 0.0,
+        "total_exec_time_ms": 529.744314,
+        "mean_exec_time_ms": 264.872157,
+        "first_ts": "2026-11-25T00:40:07Z",
+        "last_ts": "2026-11-25T06:38:32Z",
+        "query": "SELECT DISTINCT ip.ip, ip.type FROM ip INNER JOIN domain ON ip.domain_id = domain.id WHERE domain.domain ~ $1 ORDER BY type, ip"
+      }
+    ]
+  },
+  "metrics": {
+    "dns_server_messages_received_total{status=\"valid\"}": {
+      "first": 208.0,
+      "last": 454408.0,
+      "delta": 454200.0,
+      "per_day": 454599.87952365505
+    },
+    "dns_server_domains_received_total{rtype=\"cache\"}": {
+      "first": 111.0,
+      "last": 190380.0,
+      "delta": 190269.0,
+      "per_day": 190436.51359992585
+    },
+    "dns_server_domains_received_total{rtype=\"reply\"}": {
+      "first": 96.0,
+      "last": 264027.0,
+      "delta": 263931.0,
+      "per_day": 264163.3659237292
+    },
+    "dns_server_new_domains_total": {
+      "first": 1.0,
+      "last": 526.0,
+      "delta": 525.0,
+      "per_day": 525.4622121310413
+    },
+    "dns_server_processing_duration_seconds_sum": {
+      "first": 0.1225635669999999,
+      "last": 20.851502837999757,
+      "delta": 20.728939270999756,
+      "per_day": 20.747189113275322
+    },
+    "dns_resolver_domains_processed_total{status=\"success\"}": {
+      "first": 907.0,
+      "last": 652490.0,
+      "delta": 651583.0,
+      "per_day": 652156.6563180576
+    },
+    "dns_resolver_domains_processed_total{status=\"no_results\"}": {
+      "first": 93.0,
+      "last": 67486.0,
+      "delta": 67393.0,
+      "per_day": 67452.33307075668
+    },
+    "dns_resolver_lookups_total{ip_version=\"ipv4\",status=\"success\"}": {
+      "first": 902.0,
+      "last": 650258.0,
+      "delta": 649356.0,
+      "per_day": 649927.6956582179
+    },
+    "dns_resolver_lookups_total{ip_version=\"ipv4\",status=\"error\"}": {
+      "first": 98.0,
+      "last": 69742.0,
+      "delta": 69644.0,
+      "per_day": 69705.31486029377
+    },
+    "dns_resolver_lookups_total{ip_version=\"ipv6\",status=\"success\"}": {
+      "first": 314.0,
+      "last": 219498.0,
+      "delta": 219184.0,
+      "per_day": 219376.9704832955
+    },
+    "dns_resolver_lookups_total{ip_version=\"ipv6\",status=\"error\"}": {
+      "first": 686.0,
+      "last": 500502.0,
+      "delta": 499816.0,
+      "per_day": 500256.04003521614
+    },
+    "dns_cleanup_runs_total": {
+      "first": 1.0,
+      "last": 24.0,
+      "delta": 23.0,
+      "per_day": 23.0202492933599
+    },
+    "dns_cleanup_stats_deleted_total": {
+      "first": 15596.0,
+      "last": 430670.0,
+      "delta": 415074.0,
+      "per_day": 415439.4328344377
+    },
+    "dns_cleanup_domains_deleted_total": {
+      "first": 5.0,
+      "last": 481.0,
+      "delta": 476.0,
+      "per_day": 476.41907233214397
+    },
+    "dns_cleanup_ips_deleted_total": {
+      "first": 1180.0,
+      "last": 23988.0,
+      "delta": 22808.0,
+      "per_day": 22828.080255780547
+    },
+    "dns_cleanup_domain_ips_deleted_total": {
+      "first": 3.0,
+      "last": 11053.0,
+      "delta": 11050.0,
+      "per_day": 11059.728464853342
+    },
+    "dns_db_domains_total": {
+      "first": 16409.0,
+      "last": 16457.0,
+      "delta": 48.0,
+      "per_day": 48.042259394838055
+    },
+    "dns_db_ips_total": {
+      "first": 430014.0,
+      "last": 444024.0,
+      "delta": 14010.0,
+      "per_day": 14022.334460868356
+    },
+    "process_cpu_seconds_total": {
+      "first": 1.13,
+      "last": 959.51,
+      "delta": 958.38,
+      "per_day": 959.2237616421853
+    },
+    "process_resident_memory_bytes": {
+      "first": 15822848.0,
+      "last": 19197952.0,
+      "delta": 3375104.0,
+      "per_day": 3378075.4552615723
+    },
+    "avg_processing_ms": 0.04563835154337243
+  }
+}

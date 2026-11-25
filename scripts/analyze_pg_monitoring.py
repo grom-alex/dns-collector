@@ -196,7 +196,10 @@ def main():
                 last_m[key] = (cur, v)
         return first_m, last_m
 
-    m_first, m_last = parse_metrics(os.path.join(data, "collector-metrics.log"))
+    metrics_path = os.path.join(data, "collector-metrics.log")
+    if not os.path.exists(metrics_path) and os.path.exists(metrics_path + ".gz"):
+        metrics_path += ".gz"
+    m_first, m_last = parse_metrics(metrics_path)
     metrics = {}
     for k in [
         'dns_server_messages_received_total{status="valid"}',

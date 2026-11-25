@@ -1,0 +1,13 @@
+start_utc=2026-11-24T06:39:48Z
+host=docker-debian
+duration_hours=24
+duration_seconds=
+interval_seconds=300
+out_dir=/opt/dns-collector/monitoring/2.9.0-2026-11-24
+pg_container=dns-collector-postgres
+pg_user=dns_collector
+pg_db=dns_collector
+collector_url=http://localhost:8081/metrics
+webapi_url=http://localhost:8080/metrics
+end_utc=2026-11-25T06:43:34Z
+samples=286

@@ -79,10 +79,12 @@ dns-collector/                          # repository root
 │   ├── DB_BASELINE.md                  # baseline 2026-11-23 (before optimization)
 │   ├── DB_STATISTICS.md                # pg_stat_statements setup and first sample
 │   ├── DB_MONITORING.md                # 24h monitoring run and analysis guide
-│   ├── DB_MONITORING_REPORT.md         # 24h results and next steps
+│   ├── DB_MONITORING_REPORT.md         # 24h pre-optimization results
+│   ├── DB_MONITORING_REPORT_2.9.0.md   # 24h results after 2.9.0 + stage 2 plan
 │   └── baseline/
 │       ├── 2026-11-23/                 # baseline raw metrics
-│       └── 2026-11-24/                 # 24h raw metrics + analysis.json
+│       ├── 2026-11-24/                 # pre-optimization 24h raw metrics
+│       └── 2026-11-25/                 # 2.9.0 24h raw metrics + analysis.json
 │
 ├── scripts/
 │   ├── pg_monitor_24h.sh               # 24h PostgreSQL/collector sampler
