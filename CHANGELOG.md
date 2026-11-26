@@ -4,6 +4,19 @@ All notable changes to DNS Collector will be documented in this file.
 
 ## [Unreleased]
 
+## [2.9.2] - 2026-11-26
+
+### Changed
+
+- Dropped `idx_domain_last_resolv_time`: resolver query now uses a cheap seq scan/top-N sort on ~16k domains, while `domain` updates can use HOT.
+- `UpsertIPs` now uses one `INSERT ... ON CONFLICT DO UPDATE ... WHERE` statement instead of separate `INSERT` + `UPDATE`; unchanged addresses are still refreshed at most once per `ip_refresh_hours`.
+- DB metrics counts run every 300s instead of 30s (0.26 GB WAL/day for gauges).
+
+### Docker Images
+
+- `registry.gromas.ru/apps/dns-collector/dns-collector:2.9.2`
+- `registry.gromas.ru/apps/dns-collector/web-api:2.9.2`
+
 ## [2.9.1] - 2026-11-25
 
 ### Changed

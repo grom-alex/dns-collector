@@ -342,22 +342,12 @@ func (db *Database) UpsertIPs(domainID int64, ipType string, ips []string, refre
 	if _, err := tx.Exec(
 		`INSERT INTO ip (domain_id, ip, type, time)
 		 SELECT $1, unnest($2::text[]), $3, $4::timestamp
-		 ON CONFLICT (domain_id, ip) DO NOTHING`,
-		domainID, pq.Array(ips), ipType, now,
-	); err != nil {
-		return fmt.Errorf("failed to insert IPs: %w", err)
-	}
-
-	if _, err := tx.Exec(
-		`UPDATE ip
-		 SET time = $4::timestamp
-		 WHERE domain_id = $1
-		   AND type = $3
-		   AND ip = ANY($2::text[])
-		   AND time < $4::timestamp - make_interval(secs => $5)`,
+		 ON CONFLICT (domain_id, ip) DO UPDATE
+		 SET time = EXCLUDED.time
+		 WHERE ip.time < EXCLUDED.time - make_interval(secs => $5)`,
 		domainID, pq.Array(ips), ipType, now, int(refresh.Seconds()),
 	); err != nil {
-		return fmt.Errorf("failed to refresh IPs: %w", err)
+		return fmt.Errorf("failed to upsert IPs: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
