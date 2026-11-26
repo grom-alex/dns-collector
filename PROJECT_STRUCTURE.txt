@@ -81,10 +81,12 @@ dns-collector/                          # repository root
 │   ├── DB_MONITORING.md                # 24h monitoring run and analysis guide
 │   ├── DB_MONITORING_REPORT.md         # 24h pre-optimization results
 │   ├── DB_MONITORING_REPORT_2.9.0.md   # 24h results after 2.9.0 + stage 2 plan
+│   ├── DB_MONITORING_REPORT_2.9.1.md   # 24h results after 2.9.1 (index cleanup)
 │   └── baseline/
 │       ├── 2026-11-23/                 # baseline raw metrics
 │       ├── 2026-11-24/                 # pre-optimization 24h raw metrics
-│       └── 2026-11-25/                 # 2.9.0 24h raw metrics + analysis.json
+│       ├── 2026-11-25/                 # 2.9.0 24h raw metrics + analysis.json
+│       └── 2026-11-26/                 # 2.9.1 24h raw metrics + analysis.json
 │
 ├── scripts/
 │   ├── pg_monitor_24h.sh               # 24h PostgreSQL/collector sampler
