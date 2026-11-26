@@ -639,9 +639,6 @@ func TestUpsertIPs(t *testing.T) {
 	database := &Database{DB: db}
 	mock.ExpectBegin()
 	mock.ExpectExec("INSERT INTO ip").
-		WithArgs(int64(1), sqlmock.AnyArg(), "ipv4", sqlmock.AnyArg()).
-		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec("UPDATE ip").
 		WithArgs(int64(1), sqlmock.AnyArg(), "ipv4", sqlmock.AnyArg(), 86400).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()

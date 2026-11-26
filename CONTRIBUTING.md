@@ -214,7 +214,7 @@ docker compose exec -T postgres psql -U dns_collector -d dns_collector \
 
 ## 9. Hotfix
 
-1. Ветка от тега последнего релиза: `git switch -c hotfix/2.9.2 v2.9.1`.
+1. Ветка от тега последнего релиза: `git switch -c hotfix/2.9.3 v2.9.2`.
 2. Минимальное исправление + тест.
 3. PR в `main`, зелёный CI.
 4. Тег `v2.8.1`, публикация образов, деплой по разделу 7.
@@ -234,4 +234,4 @@ docker compose exec -T postgres psql -U dns_collector -d dns_collector \
 - `.claude/DEVELOPMENT_WORKFLOW.md` оставлен как указатель на этот документ.
 - PR template: [.github/pull_request_template.md](.github/pull_request_template.md).
 - CI-пробелы перечислены в разделе 5; Docker-публикация в `release.yml` добавлена, остаются `build.yml`, branch protection и frontend-проверки (QUA-3).
-- Деплой-документация: [DEPLOYMENT.md](DEPLOYMENT.md), [deploy/production/README.md](deploy/production/README.md); версии синхронизированы с 2.9.1.
+- Деплой-документация: [DEPLOYMENT.md](DEPLOYMENT.md), [deploy/production/README.md](deploy/production/README.md); версии синхронизированы с 2.9.2.

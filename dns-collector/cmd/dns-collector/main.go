@@ -87,7 +87,8 @@ func main() {
 		}
 
 		// Start DB metrics collector (updates domain/IP counts every 30 seconds)
-		dbCollector := metrics.NewDBCollector(db, metricsRegistry, 30)
+		// Counts are used for gauges only; 30s was generating ~0.26 GB WAL/day.
+		dbCollector := metrics.NewDBCollector(db, metricsRegistry, 300)
 		dbCollector.Start()
 		defer dbCollector.Stop()
 
