@@ -135,7 +135,6 @@ func (db *Database) initSchema() error {
 		rtype TEXT NOT NULL,
 		timestamp TIMESTAMP NOT NULL
 	);
-	CREATE INDEX IF NOT EXISTS idx_domain_stat_timestamp ON domain_stat(timestamp);
 	`
 
 	if _, err := db.DB.Exec(statSchema); err != nil {
@@ -410,10 +409,32 @@ func (db *Database) InsertDomainStat(domain, clientIP, rtype string) error {
 	return nil
 }
 
-// DeleteOldStats deletes statistics records older than the specified number of days
+// DeleteOldStats deletes statistics records older than the specified number of days.
+// For a partitioned domain_stat it first drops whole old monthly partitions,
+// then deletes the remaining tail rows from the oldest retained partition.
 func (db *Database) DeleteOldStats(retentionDays int) (int64, error) {
 	cutoffTime := time.Now().AddDate(0, 0, -retentionDays)
 
+	partitioned, err := db.isDomainStatPartitioned()
+	if err != nil {
+		return 0, fmt.Errorf("failed to inspect domain_stat partitioning: %w", err)
+	}
+	if !partitioned {
+		return db.deleteOldStatsRows(cutoffTime)
+	}
+
+	dropped, err := db.dropOldDomainStatPartitions(cutoffTime)
+	if err != nil {
+		return 0, err
+	}
+	deleted, err := db.deleteOldStatsRows(cutoffTime)
+	if err != nil {
+		return 0, err
+	}
+	return dropped + deleted, nil
+}
+
+func (db *Database) deleteOldStatsRows(cutoffTime time.Time) (int64, error) {
 	result, err := db.DB.Exec(
 		`DELETE FROM domain_stat WHERE timestamp < $1`,
 		cutoffTime,
@@ -426,8 +447,107 @@ func (db *Database) DeleteOldStats(retentionDays int) (int64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("failed to get rows affected: %w", err)
 	}
-
 	return deleted, nil
+}
+
+func (db *Database) isDomainStatPartitioned() (bool, error) {
+	var partitioned bool
+	err := db.DB.QueryRow(`
+		SELECT EXISTS (
+			SELECT 1
+			FROM pg_partitioned_table pt
+			JOIN pg_class c ON c.oid = pt.partrelid
+			WHERE c.relname = 'domain_stat'
+			  AND c.relnamespace = 'public'::regnamespace
+		)`).Scan(&partitioned)
+	if err != nil {
+		return false, err
+	}
+	return partitioned, nil
+}
+
+// EnsureDomainStatPartitions creates the current and next months' partitions.
+// It is a no-op for a non-partitioned table (old schema).
+func (db *Database) EnsureDomainStatPartitions(now time.Time, monthsAhead int) error {
+	partitioned, err := db.isDomainStatPartitioned()
+	if err != nil {
+		return err
+	}
+	if !partitioned {
+		return nil
+	}
+	if monthsAhead < 0 {
+		monthsAhead = 0
+	}
+
+	for i := 0; i <= monthsAhead; i++ {
+		start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC).AddDate(0, i, 0)
+		end := start.AddDate(0, 1, 0)
+		name := "domain_stat_" + start.Format("2006_01")
+		ddl := fmt.Sprintf(
+			`CREATE TABLE IF NOT EXISTS %s PARTITION OF domain_stat FOR VALUES FROM ('%s') TO ('%s')`,
+			pq.QuoteIdentifier(name), start.Format("2006-01-02"), end.Format("2006-01-02"),
+		)
+		if _, err := db.DB.Exec(ddl); err != nil {
+			return fmt.Errorf("failed to create partition %s: %w", name, err)
+		}
+	}
+	return nil
+}
+
+func (db *Database) dropOldDomainStatPartitions(cutoffTime time.Time) (int64, error) {
+	rows, err := db.DB.Query(`
+		SELECT child.relname,
+		       left(split_part(pg_get_expr(child.relpartbound, child.oid), '''', 4), 10)
+		FROM pg_inherits
+		JOIN pg_class parent ON parent.oid = inhparent
+		JOIN pg_class child ON child.oid = inhrelid
+		WHERE parent.relname = 'domain_stat'
+		  AND parent.relnamespace = 'public'::regnamespace`)
+	if err != nil {
+		return 0, fmt.Errorf("failed to list domain_stat partitions: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	type partition struct {
+		name  string
+		upper time.Time
+	}
+	var old []partition
+	for rows.Next() {
+		var name string
+		var upper sql.NullString
+		if err := rows.Scan(&name, &upper); err != nil {
+			return 0, fmt.Errorf("failed to scan domain_stat partition: %w", err)
+		}
+		if !upper.Valid {
+			continue
+		}
+		t, err := time.Parse("2006-01-02", upper.String)
+		if err != nil {
+			continue
+		}
+		if !t.After(cutoffTime) {
+			old = append(old, partition{name: name, upper: t})
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return 0, fmt.Errorf("failed to read domain_stat partitions: %w", err)
+	}
+	_ = rows.Close()
+
+	var dropped int64
+	for _, p := range old {
+		var n int64
+		if err := db.DB.QueryRow(fmt.Sprintf(`SELECT count(*) FROM %s`, pq.QuoteIdentifier(p.name))).Scan(&n); err != nil {
+			return dropped, fmt.Errorf("failed to count rows in %s: %w", p.name, err)
+		}
+		if _, err := db.DB.Exec(fmt.Sprintf(`DROP TABLE %s`, pq.QuoteIdentifier(p.name))); err != nil {
+			return dropped, fmt.Errorf("failed to drop partition %s: %w", p.name, err)
+		}
+		dropped += n
+	}
+	return dropped, nil
 }
 
 // UpdateDomainLastSeen updates the last_seen timestamp for a domain

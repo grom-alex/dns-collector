@@ -396,6 +396,8 @@ func TestDeleteOldStats(t *testing.T) {
 
 	database := &Database{DB: db}
 
+	mock.ExpectQuery(`SELECT EXISTS`).
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
 	mock.ExpectExec(`DELETE FROM domain_stat WHERE timestamp <`).
 		WithArgs(sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 42))
@@ -423,6 +425,8 @@ func TestDeleteOldStats_NoneDeleted(t *testing.T) {
 
 	database := &Database{DB: db}
 
+	mock.ExpectQuery(`SELECT EXISTS`).
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
 	mock.ExpectExec(`DELETE FROM domain_stat WHERE timestamp <`).
 		WithArgs(sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 0))

@@ -36,6 +36,10 @@ func NewService(cfg *config.Config, db *database.Database, m *metrics.Registry) 
 func (s *Service) Start() {
 	log.Printf("Starting cleanup service (stats retention: %d days, IP TTL: %d days, domain TTL: %d days)", s.retentionDays, s.ipTTLDays, s.domainTTLDays)
 
+	if err := s.db.EnsureDomainStatPartitions(time.Now(), 3); err != nil {
+		log.Printf("Error ensuring domain_stat partitions: %v", err)
+	}
+
 	// Run cleanup immediately on startup
 	s.cleanup()
 
@@ -73,6 +77,11 @@ func (s *Service) cleanup() {
 	s.recordMetric(func(m *metrics.Registry) {
 		m.CleanupRuns.Inc()
 	})
+
+	// Keep current and next monthly partitions available before retention.
+	if err := s.db.EnsureDomainStatPartitions(time.Now(), 3); err != nil {
+		log.Printf("Error ensuring domain_stat partitions: %v", err)
+	}
 
 	// 1. Cleanup old statistics
 	statsDeleted, err := s.db.DeleteOldStats(s.retentionDays)
