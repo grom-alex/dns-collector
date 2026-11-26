@@ -221,9 +221,12 @@ HOT-update возможен, только если **ни один индекс�
 
 ### Этап 2. Индексы, fillfactor, запрос резолвера (2 дня)
 
+**Статус 2.9.1 (факт):** удалено 13 индексов (~3,57 GB), `fillfactor=70` для `domain`/`ip`; WAL 7,52 → **3,69 GB/сутки**, `sdb1` 36,6 → **18,9 GB/сутки**, БД 7 759 → **4 191 MB**. HOT: `ip` **99,7%**, `domain` только **13,3%** — fillfactor не применился к существующим страницам, `idx_domain_last_resolv_time` остался. Нужен `VACUUM FULL`/`pg_repack` по `domain` и партиционирование `domain_stat`; подробности — [DB_MONITORING_REPORT_2.9.1.md](DB_MONITORING_REPORT_2.9.1.md).
+
+
 - [ ] Удалить индексы из таблицы выше: `idx_domain_resolv`, `idx_domain_last_seen`, `idx_domain_resolv_count`, `idx_domain_last_resolv_time`, `idx_domain_resolv_lookup`, `idx_ip_domain_id`, `idx_ip_type`, `idx_ip_domain_type`.
 - [ ] Переписать `GetDomainsToResolve`: убрать OR-ветку с недостижимым cooldown (см. `resolver.go`) либо заменить её на `next_resolve_at`; сортировка по `last_resolv_time` без индекса допустима на 15 тыс. строк, но лучше сразу перейти на `domain_schedule` (этап 6).
-- [ ] `ALTER TABLE domain SET (fillfactor = 85)`; `ALTER TABLE ip SET (fillfactor = 85)`.
+- [x] `ALTER TABLE domain SET (fillfactor = 70)`; `ALTER TABLE ip SET (fillfactor = 70)` — применено в 2.9.1; 85 остаётся кандидатом после `VACUUM FULL`/`pg_repack`.
 - [ ] `domain_stat`: удалить лишние индексы (`rtype`, отдельные `client_ip` и `domain`, `DESC`-дубликаты), оставить `(timestamp)`, `(client_ip, timestamp)`, `(domain, timestamp)`.
 - [ ] Проверить `EXPLAIN (ANALYZE, BUFFERS)` для запросов web-api: не появились ли seq scan на больших таблицах.
 
