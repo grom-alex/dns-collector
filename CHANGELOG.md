@@ -4,6 +4,20 @@ All notable changes to DNS Collector will be documented in this file.
 
 ## [Unreleased]
 
+## [2.9.3] - 2026-11-26
+
+### Changed
+
+- `domain_stat` partitioned by month; old monthly partitions are dropped by retention, tail rows deleted normally.
+- New per-partition indexes: `(timestamp)` and `(domain, timestamp)`; no primary key / `time_domain` index.
+- `EnsureDomainStatPartitions` creates current and next months' partitions at startup/cleanup.
+- Production conversion preserves IDs and continues the sequence.
+
+### Docker Images
+
+- `registry.gromas.ru/apps/dns-collector/dns-collector:2.9.3`
+- `registry.gromas.ru/apps/dns-collector/web-api:2.9.3`
+
 ## [2.9.2] - 2026-11-26
 
 ### Changed
